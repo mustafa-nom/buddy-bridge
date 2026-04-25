@@ -373,5 +373,44 @@ class OrchestratorTest(unittest.TestCase):
                 self.assertGreater(len(lua), 100, f"{label} emitted nothing")
 
 
+class DumpPreliminaryMapTest(unittest.TestCase):
+    """dump_preliminary_map must write a labelled lua program with all 9 sections."""
+
+    def test_dump_writes_expected_sections(self) -> None:
+        try:
+            from buddy_map_generator.server import dump_preliminary_map
+        except ImportError:
+            self.skipTest("mcp package not installed; skipping dump test")
+
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".lua", delete=False) as tf:
+            path = tf.name
+
+        try:
+            result = dump_preliminary_map(output_path=path)
+            self.assertEqual(result["mode"], "dump")
+            self.assertEqual(result["step_count"], 9)
+            with open(path) as f:
+                content = f.read()
+            for label in [
+                "build_lobby",
+                "build_play_arena_slots",
+                "build_booth_template",
+                "build_stranger_danger_park",
+                "build_backpack_checkpoint",
+                "build_npc_templates",
+                "build_item_templates",
+                "build_polish_pass",
+                "verify_style",
+            ]:
+                self.assertIn(f"-- ===== {label} =====", content)
+        finally:
+            import os as _os
+
+            if _os.path.exists(path):
+                _os.unlink(path)
+
+
 if __name__ == "__main__":
     unittest.main()
