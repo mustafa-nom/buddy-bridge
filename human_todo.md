@@ -1,46 +1,75 @@
 # Human TODO
 
-These tasks need to be done manually. Some are split between the **Map User** (User 1, with Roblox MCP / Studio) and the **Scripting User** (User 2, with Rojo + Claude Code). Others require both to coordinate.
+Tasks split between the **Map User** (User 1, Roblox MCP / Studio) and the **Scripting User** (User 2, Rojo + Claude Code).
 
 Claude should not mark related features complete until the human confirms these are done.
 
 ## Tooling Verification
 
-- [ ] Confirm `aftman install` succeeds and pulls Rojo `7.7.0-rc4` and Selene `0.27.1`. If `7.7.0-rc4` is not the latest available `rc`, bump `aftman.toml` to the newest `7.7.0-rc*` tag from https://github.com/rojo-rbx/rojo/releases.
-- [ ] Install the matching Rojo Studio plugin (must match the CLI version).
-- [ ] Confirm `rojo serve default.project.json` connects to Studio successfully.
+- [ ] `aftman install` succeeds and pulls Rojo `7.7.0-rc4` and Selene `0.27.1`. If `7.7.0-rc4` is not the latest available `rc`, bump `aftman.toml` to the newest `7.7.0-rc*` tag from https://github.com/rojo-rbx/rojo/releases.
+- [ ] Rojo Studio plugin installed at the matching version.
+- [ ] `rojo serve default.project.json` connects successfully.
 
 ## Studio Map (User 1 — see `prompts/user1_map_prompt.md`)
 
 ### Lobby
-- [ ] Create the main Lobby area
-- [ ] Place 4 capsule pad pairs (8 pads total), each tagged `LobbyCapsule` with a `CapsuleId`, paired by a shared `CapsulePairId`
-- [ ] Add lobby spawn so all players land in the lobby on join
-- [ ] Add visual treehouse / garden area for progression display
+
+- [ ] Main lobby area built
+- [ ] Lobby `SpawnLocation` placed
+- [ ] 4 capsule pad pairs (8 pads total) tagged `LobbyCapsule` with `CapsuleId` + `CapsulePairId`
+- [ ] Treehouse / garden visual area for progression display
 
 ### Play Arena Slots
-- [ ] Build 4 `PlayArenaSlot` models in a hidden region (e.g. far below the lobby)
-- [ ] Each slot has: `SlotIndex` attribute, `RunnerSpawn` part, `BoothAnchor` part, empty `PlayArea` Folder, empty `Booth` Folder
 
-### Room Templates (in `ServerStorage/Rooms`)
-- [ ] `ButtonRoom` Model with `PrimaryPart`, `RoomEntry`, `RoomExit`, and ~6 buttons each tagged `BuddyButton` with `InteractableId`
-- [ ] `BridgeBuilder` Model with bridge segments tagged `BuddyBridge` and an endpoint tagged `RoomExit`
-- [ ] `DoorDecoder` Model with 3 doors tagged `BuddyDoor` with `InteractableId`
+- [ ] 4 `PlayArenaSlot` models in `Workspace/PlayArenaSlots`, hidden region (e.g. y = -500)
+- [ ] Each slot has `SlotIndex` attribute, `ExplorerSpawn` part, `BoothAnchor` part, empty `PlayArea` Folder, empty `Booth` Folder
+- [ ] Slots spaced far apart so cloned levels don't overlap
+
+### Level Templates (in `ServerStorage/Levels`)
+
+#### StrangerDangerPark
+- [ ] Park / town plaza geometry (fountain, hot dog stand, parked car, alley behind shop, playground)
+- [ ] `PrimaryPart` set
+- [ ] `LevelEntry` part where Explorer spawns
+- [ ] 6–8 `BuddyNpcSpawn` parts each with unique `NpcSpawnId`
+- [ ] 4+ candidate `PuppySpawn` parts
+- [ ] `LevelExit` zone that fires when Explorer reaches the puppy
+- [ ] Themed but kid-friendly aesthetic (no horror)
+
+#### BackpackCheckpoint
+- [ ] Conveyor belt model with `BeltStart` and `BeltEnd` reference parts
+- [ ] 3 bins tagged `BuddyBin` with `LaneId` ∈ `"PackIt"` | `"AskFirst"` | `"LeaveIt"`
+- [ ] Standing area for the Explorer
+- [ ] `LevelEntry` and `LevelExit` parts
+- [ ] TSA-style cartoon checkpoint aesthetic
+
+### NPC Templates (in `ServerStorage/NpcTemplates`)
+
+- [ ] At least 6 visually distinct NPC rigs (different outfits — shop worker apron, police uniform, casual park goer, parent with stroller, etc.)
+- [ ] Each NPC has a head-mounted name/trait BillboardGui anchor (User 2 fills text at runtime)
+
+### Item Templates (in `ServerStorage/ItemTemplates`)
+
+- [ ] Cartoon item models for each entry in the item pool — see `docs/GAME_DESIGN.md` "Backpack Checkpoint" item list
+- [ ] Each is an anchored Model with `PrimaryPart`
 
 ### Booth Template (in `ServerStorage/GuideBooths`)
-- [ ] `DefaultBooth` Model with `PrimaryPart`, `GuideSpawn`, `ControlPanel`, and a `Window` (transparent part) facing the play area
+
+- [ ] `DefaultBooth` Model with `PrimaryPart`, `GuideSpawn`, `ControlPanel` (with SurfaceGui anchor), and a `Window` (transparent part) facing the play area
+- [ ] No door — Guide cannot leave by walking
 
 ### Tags & Attributes Sanity Pass
-- [ ] All required CollectionService tags applied (see `docs/TECHNICAL_DESIGN.md` "Map Object Conventions")
-- [ ] All `InteractableId` attributes are unique within a room template
-- [ ] All `RoomType` attributes set on room template root models
+
+- [ ] All required CollectionService tags applied — see `docs/TECHNICAL_DESIGN.md` "Map Object Conventions"
+- [ ] All `NpcSpawnId`, `LaneId`, `CapsuleId`, `CapsulePairId`, `SlotIndex` attributes set
+- [ ] All `LevelType` attributes set on level template root models
 
 ### Visual Polish
-- [ ] Bright, playful colors / materials
-- [ ] Clear signage for Runner and Guide areas
-- [ ] Treehouse / garden visuals for progression
-- [ ] Funny trap visuals (slime, chickens, fake explosions)
-- [ ] Basic SFX placeholders for: button press, wrong answer, room complete, round complete
+
+- [ ] Bright, kid-friendly color palette
+- [ ] Cartoon proportions
+- [ ] Signage at lobby capsules ("Buddy Pair 1", etc.)
+- [ ] SFX placeholders in `SoundService`: `ConfirmPair`, `RoundStart`, `LevelComplete`, `WrongSort`, `CorrectSort`, `ClueCollected`, `RiskyTalk`
 
 ## Scripting (User 2 — see `prompts/user2_scripting_prompt.md`)
 
@@ -49,16 +78,16 @@ Claude should not mark related features complete until the human confirms these 
 
 ## Roblox Settings
 
-- [ ] Set max players per server = 8 in Game Settings
+- [ ] Set max players per server = 8
 - [ ] Enable Studio API access if DataStores are used
-- [ ] Configure experience name and thumbnail before submitting
-- [ ] Test with 2-player local server in Studio
+- [ ] Configure experience name + thumbnail before submitting
+- [ ] Test with 2-player Studio local server
 - [ ] Publish test place before final Devpost submission
 
 ## Demo Prep
 
-- [ ] Prepare one clean demo route through all 3 rooms
-- [ ] Have two team members ready as Runner and Guide
-- [ ] Practice pitch under time limit
+- [ ] Practice the demo route under 5 minutes
+- [ ] Two team members ready to play (Explorer + Guide)
+- [ ] Practice pitch — lead with the Learn-and-Explore framing
 - [ ] Take screenshots / GIFs for Devpost
 - [ ] Record backup demo video

@@ -2,101 +2,103 @@
 
 ## Current Priority
 
-Build a playable MVP of Buddy Bridge.
+Build a polished MVP of Buddy Bridge with **2 levels**: Stranger Danger Park and Backpack Checkpoint.
 
 ## Setup
 
-- [ ] Confirm Rojo project structure
-- [ ] Confirm Selene config
-- [ ] Create base folder structure
-- [ ] Create RemoteService
-- [ ] Create Constants, RoleTypes, RoomTypes
-- [ ] Create ServerBootstrap
-- [ ] Create ClientBootstrap
+- [ ] `aftman install` — verify Rojo 7.7.0-rc4 + Selene 0.27.1
+- [ ] `rojo serve` connects to Studio
+- [ ] Confirm `init.meta.json` exists in every `src/` subfolder
+- [ ] Create base service skeletons
 
-## Core Services
+## Core Modules
 
-- [ ] Implement MatchService
-- [ ] Implement RoleService
-- [ ] Implement RoundService skeleton
-- [ ] Implement RoomService skeleton
-- [ ] Implement ScenarioService
-- [ ] Implement ScoringService
-- [ ] Implement RewardService session data
+- [ ] `RemoteService.lua`
+- [ ] `Modules/Constants.lua`
+- [ ] `Modules/RoleTypes.lua`
+- [ ] `Modules/LevelTypes.lua`
+- [ ] `Modules/PlayAreaConfig.lua`
+- [ ] `Modules/ScenarioRegistry.lua`
+- [ ] `Modules/NpcRegistry.lua` — NPC trait pool for Stranger Danger
+- [ ] `Modules/ItemRegistry.lua` — item pool + lane mapping for Backpack Checkpoint
+- [ ] `Modules/ScoringConfig.lua`
+- [ ] `Modules/UIStyle.lua`
 
-## UI Controllers
+## Bootstrap
 
-- [ ] Implement RoleSelectController
-- [ ] Implement RoundHudController
-- [ ] Implement GuideManualController
-- [ ] Implement GuideControlsController
-- [ ] Implement RunnerController
-- [ ] Implement ScoreScreenController
-- [ ] Implement NotificationController
-- [ ] Implement LobbyProgressionController
+- [ ] `ServerBootstrap.server.lua` requires all server services
+- [ ] `ClientBootstrap.client.lua` requires all client controllers
 
-## MVP Gameplay
+## Lobby + Pairing
 
-### Lobby
+- [ ] `LobbyService.lua` — capsule pad detection, invite flow
+- [ ] `MatchService.lua` — pair create/get/remove
+- [ ] `RoleService.lua` — role assignment
+- [ ] `LobbyPairController.client.lua` — confirm pair UI + invite UI
+- [ ] `RoleSelectController.client.lua` — pick Explorer / Guide
+- [ ] Test: 2 players can pair via capsule and via proximity prompt
 
-- [ ] Pair two players
-- [ ] Select Runner/Guide roles
-- [ ] Start round
-- [ ] Return to lobby
+## Round + Slot Management
 
-### Button Room
+- [ ] `PlayAreaService.lua` — slot pool, clone level templates, clone booth, teleport players, lock booth
+- [ ] `RoundService.lua` — start/end round, level sequence, timer
+- [ ] `LevelService.lua` — start/complete/cleanup the active level
+- [ ] Test: paired duo gets teleported to a slot; Explorer in level, Guide in booth
 
-- [ ] Generate button scenario server-side
-- [ ] Display buttons to Runner
-- [ ] Display guide clues to Guide
-- [ ] Validate button press server-side
-- [ ] Correct button opens path
-- [ ] Wrong button triggers consequence
-- [ ] Update mistakes and trust points
+## Stranger Danger Park
 
-### Bridge Builder
+- [ ] `ScenarioService.lua` — generate randomized NPC scenario
+- [ ] Wire up `LevelService` to attach scenario to cloned NPCs at level start
+- [ ] `ExplorerInteractionService.lua` — `RequestInspectNpc`, `RequestTalkToNpc`
+- [ ] `GuideControlService.lua` — `RequestAnnotateNpc`
+- [ ] `ExplorerController.client.lua` — handle proximity-based NPC inspect
+- [ ] `NpcDescriptionCardController.client.lua` — show trait card to Explorer
+- [ ] `GuideManualController.client.lua` — render trait/risk manual on booth SurfaceGui
+- [ ] `GuideAnnotationController.client.lua` — annotation buttons
+- [ ] Visual: colored ring around NPC when Guide annotates
+- [ ] Quest: 3 clues → puppy spawn → level exit
+- [ ] Test: full level playthrough with 2 players
 
-- [ ] Add bridge objects
-- [ ] Guide can activate bridge pieces
-- [ ] Runner can cross
-- [ ] Server validates Guide controls
-- [ ] Room completes at endpoint
+## Backpack Checkpoint
 
-### Door Decoder
+- [ ] Generate randomized item rotation server-side
+- [ ] Conveyor logic — spawn item, advance after sort
+- [ ] `ExplorerInteractionService` — `RequestPickupItem`, `RequestPlaceItemInLane`
+- [ ] `GuideControlService` — `RequestAnnotateItem`
+- [ ] Bin SFX / VFX on correct vs. wrong sort
+- [ ] Manual UI shows the chart (Pack It / Ask First / Leave It rules)
+- [ ] N items per round → level complete
+- [ ] Test: full level playthrough with 2 players
 
-- [ ] Generate door scenario server-side
-- [ ] Display door messages
-- [ ] Display guide clue card
-- [ ] Validate door choice server-side
-- [ ] Correct door advances
-- [ ] Wrong door triggers consequence
+## Round Transition + Scoring
 
-## Scoring and Rewards
+- [ ] Portal between Stranger Danger and Backpack Checkpoint inside the slot
+- [ ] `ScoringService.lua` — track time, mistakes, trust points
+- [ ] `RewardService.lua` — grant Trust Seeds (session-only data is fine)
+- [ ] `ScoreScreenController.client.lua` — final score UI + replay
+- [ ] `RoundHudController.client.lua` — timer + objective + mistakes
+- [ ] Return-to-lobby flow
 
-- [ ] Track timer
-- [ ] Track mistakes
-- [ ] Track trust points
-- [ ] Calculate rank
-- [ ] Grant Trust Seeds
-- [ ] Show final score screen
-- [ ] Update lobby progression
+## Lobby Progression
+
+- [ ] `DataService.lua` — session-only data
+- [ ] `LobbyProgressionController.client.lua` — visualize Trust Seeds / treehouse level
 
 ## Polish
 
-- [ ] Add sounds
-- [ ] Add simple effects
-- [ ] Add clear UI styling
-- [ ] Add short tutorial prompts
-- [ ] Add replay button
-- [ ] Add demo-friendly flow
+- [ ] SFX hookups (button press, wrong sort, level complete, round complete)
+- [ ] Cartoon font + friendly UI styling pass
+- [ ] Short tutorial prompts on first run
+- [ ] Replay flow tested end-to-end
+- [ ] Demo route timed under 5 minutes
 
 ## Verification
 
-- [ ] Test in 1-player debug mode if implemented
-- [ ] Test in 2-player Studio server
-- [ ] Test Runner leaving
-- [ ] Test Guide leaving
-- [ ] Test remote spam
-- [ ] Run `selene src/`
-- [ ] Check all files under 500 lines
-- [ ] Confirm no critical output errors
+- [ ] `selene src/` passes
+- [ ] All files in `src/` under 500 lines
+- [ ] All remotes validate input + role
+- [ ] No client-side authoritative gameplay state
+- [ ] Tested with 2 players in Studio local server
+- [ ] Tested 4 simultaneous duos do not cross-talk
+- [ ] `tasks/todo.md` updated
+- [ ] `tasks/lessons.md` updated if any pattern was corrected

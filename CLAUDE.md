@@ -4,28 +4,58 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Buddy Bridge** is a replayable 2-player asymmetric co-op Roblox obby designed for the LAHacks Roblox Civility Challenge.
+**Buddy Bridge** is a replayable 2-player asymmetric co-op Roblox experience designed for the LAHacks Roblox Civility Challenge.
 
-The game is inspired by **Keep Talking and Nobody Explodes**, 2-player obbies, and cozy parent-child Roblox experiences like Grow a Garden.
+The game is inspired by **Keep Talking and Nobody Explodes**, 2-player co-op puzzlers, and cozy parent-child Roblox experiences like Grow a Garden.
 
-One player is the **Runner**, who plays through an obby full of buttons, bridges, doors, and traps.
+One player is the **Explorer**, who moves through the world, meets characters, and handles items.
 
-The other player is the **Guide**, who stays in a control booth and sees extra information, clue cards, and controls that help the Runner.
+The other player is the **Guide**, who stays in a control booth and sees the rules, warning signs, and clue manuals the Explorer doesn't.
 
-The hidden learning goal is early digital safety, trust, civility, and parent-child communication. However, the game should **not feel like an educational game**. It should feel like a fun Roblox co-op obby first.
+### Educational Goal — and Why It's Now Front-and-Center
+
+After follow-up conversations with the LAHacks judges, the educational angle is now **explicitly part of the pitch**, not a hidden layer. The judges indicated this game could plausibly be promoted in Roblox's **"Learn and Explore"** sort if the execution is polished. That changes how we present the game:
+
+- The game **is** an educational experience for kids about online safety, civility, and digital citizenship.
+- It must still feel like a fun Roblox co-op game — not a quiz, not a lecture.
+- The lessons are taught through **mechanics**, where communication between the Explorer and the Guide is the way you actually solve the level.
+- Polish 1–2 levels deeply rather than ship many shallow ones. Judges said they only need to see the vision — the depth in two levels proves we could build out the rest.
+
+### The "Explain It To My Boss" Test (from judge Jenine)
+
+The Roblox judge needs to be able to explain this game to her boss in one sentence. That means:
+
+- **One clear problem**, not vague.
+- **One clear mechanic** that addresses it.
+- **One clear reason** anyone would actually want to play.
+
+Our one-line pitch (drilled in `docs/JUDGING_STRATEGY.md`):
+
+> Buddy Bridge is a 2-player co-op where the grownup has the safety rulebook and the kid has the actions — they have to talk to win, which is exactly the habit kids should build for the real internet.
+
+Every design decision should make that sentence more obviously true. If a feature can't be defended by that sentence, cut it.
+
+### Validated By Judges
+
+After the follow-up conversations:
+- **Stranger Danger framing is verified** (judge Andrew): scenes with classic stranger-danger archetypes (white van, person with a knife, person asking your name, etc.). Use these explicit cues in NPC traits.
+- **Backpack Checkpoint / TSA framing is verified** (judge Andrew): keep it.
+- **Asymmetric-info-relayed-for-life-skills is the core mechanic** (judge Andrew). It's the pitch hook — lead with it.
+- **Visual consistency matters** (judge Andrew): one cohesive art style across lobby, both levels, NPCs, items, booth. No mix-and-match.
+- **Reference comp** (judge Jenine): *Ecos La Brea* — educational MMO that doesn't feel like homework. Aim for that bar.
 
 Core message:
 
 > Pause. Talk. Choose together.
 
-The game should be fun and replayable even if the player ignores the educational theme.
+The Explorer wants to act. The Guide has the safety knowledge. Communication is the mechanic.
 
 NO FILE SHOULD BE BIGGER THAN 500 LINES. If a file is getting too large, split logic into smaller modules and require them.
 
 ## Server / Multiplayer Model
 
 - **Max players per server:** 8
-- **Players per duo:** 2 (one Runner, one Guide)
+- **Players per duo:** 2 (one Explorer, one Guide)
 - **Max simultaneous duos per server:** 4
 
 Each duo plays in its own **instanced play area**. The map has N pre-built **play arena slots** in a hidden area of the workspace. When a duo starts a round, the server picks an open slot, clones the room templates from `ServerStorage` into it, and teleports both players there.
@@ -39,24 +69,24 @@ The lobby supports two ways to pair:
 1. **Capsules:** Pairs of capsule pads sit around the lobby. Two players step into matching capsules (or two adjacent pads) and a `StartPair` prompt appears. When both confirm, they become a duo.
 2. **Player Proximity Prompt:** Walking up to another player exposes a "Invite to Play" `ProximityPrompt`. Triggering it sends an invite. The target sees an accept/decline prompt. On accept, the pair is formed.
 
-After pairing, the duo picks Runner/Guide (or auto-assigns), then presses **Start Round**.
+After pairing, the duo picks Explorer/Guide (or auto-assigns), then presses **Start Round**.
 
 ### Guide Booth Design
 
 When a round starts, the Guide is **teleported to a private control booth** attached to the duo's play arena slot. The booth is enclosed (cannot leave during the round) and contains:
 
-- A control panel UI for room-specific actions (scan, activate bridge, etc.)
-- A clue manual UI
-- A live view of the Runner — either through a transparent window in the booth wall or via a camera feed UI showing the Runner's path
+- A clue manual UI for the active level (warning signs, sorting chart, etc.)
+- Level-specific control / annotation UI (mark NPCs as risky, flag items, etc.)
+- A live view of the Explorer — either through a transparent window in the booth wall or via a camera feed UI
 
-The Guide does **not** physically follow the Runner. This keeps the asymmetry sharp, prevents visual clutter when multiple duos run simultaneously, and makes communication the only way to coordinate.
+The Guide does **not** physically follow the Explorer. This keeps the asymmetry sharp, prevents visual clutter when multiple duos run simultaneously, and makes communication the only way to coordinate.
 
 ### Play Area Slot Lifecycle
 
 1. `PlayAreaService` reserves an open slot when `RoundService:StartRound` is called.
-2. Room templates (`ServerStorage/Rooms/*`) are cloned into the slot's `PlayArea` folder, positioned via the slot's reference part/CFrame.
+2. Level templates (`ServerStorage/Levels/*`) are cloned into the slot's `PlayArea` folder, positioned via the slot's reference part/CFrame.
 3. The booth template (`ServerStorage/GuideBooths/*`) is cloned into the slot's `Booth` folder.
-4. Runner is teleported to the slot's `RunnerSpawn`. Guide is teleported to the slot's `GuideSpawn` inside the booth.
+4. Explorer is teleported to the slot's `ExplorerSpawn`. Guide is teleported to the slot's `GuideSpawn` inside the booth.
 5. On round end, the slot's cloned children are destroyed and the slot is released back to the pool.
 
 ## Hackathon Context
@@ -70,17 +100,20 @@ Judges care about:
 4. A game that does not feel like a boring educational quiz
 5. Replayability and potential real-world impact
 
-Important judge insight:
+Important judge insight (after our follow-up conversation):
+- The judges DO want something educational. The game could plausibly land in Roblox's **"Learn and Explore"** sort if polished.
+- They told us to **focus on 1–2 super polished levels** — not many shallow ones. They will see the vision from depth, not from breadth.
 - One judge is a Roblox Studio software engineer and wants something fun to actually play.
 - One judge is on the civility team and cares about parents and kids learning together.
 - Another judge likes examples where parents naturally play with kids, like Grow a Garden.
 
 Therefore:
-- Do not build a lecture game.
-- Do not build a quiz game.
-- Do not over-explain lessons.
-- Build a fun 2-player obby where communication is the mechanic.
-- Let the safety and civility message emerge through gameplay.
+- Lean into the educational framing. This is a kid + grownup co-op safety game.
+- Still no lectures, still no quiz screens. Teach through mechanics.
+- Pick **2 levels** and polish them to a shippable bar:
+  1. **Stranger Danger Park** (the headline level — Keep-Talking-and-Nobody-Explodes style social safety)
+  2. **Backpack Checkpoint** (a shorter sorting level disguising digital citizenship — privacy and what to share online)
+- Skip every other level concept until those two are demo-ready.
 
 ## Development Commands
 
@@ -124,8 +157,10 @@ src/
 │   ├── Modules/
 │   │   ├── Constants.lua
 │   │   ├── RoleTypes.lua
-│   │   ├── RoomTypes.lua
+│   │   ├── LevelTypes.lua
 │   │   ├── ScenarioRegistry.lua
+│   │   ├── NpcRegistry.lua            (Stranger Danger NPC pool)
+│   │   ├── ItemRegistry.lua           (Backpack Checkpoint item pool)
 │   │   ├── ScoringConfig.lua
 │   │   ├── PlayAreaConfig.lua
 │   │   ├── NumberFormatter.lua
@@ -142,33 +177,34 @@ src/
 │       ├── RoleService.lua
 │       ├── PlayAreaService.lua
 │       ├── RoundService.lua
-│       ├── RoomService.lua
+│       ├── LevelService.lua
 │       ├── ScenarioService.lua
 │       ├── ScoringService.lua
 │       ├── GuideControlService.lua
-│       ├── RunnerInteractionService.lua
+│       ├── ExplorerInteractionService.lua
 │       ├── RewardService.lua
 │       ├── DataService.lua
 │       └── AnalyticsService.lua
 │
 ├── ServerStorage/
-│   ├── Rooms/
-│   │   ├── ButtonRoom (Model)
-│   │   ├── BridgeBuilder (Model)
-│   │   └── DoorDecoder (Model)
+│   ├── Levels/
+│   │   ├── StrangerDangerPark (Model)
+│   │   └── BackpackCheckpoint (Model)
+│   ├── NpcTemplates/                  (NPC rigs for Stranger Danger)
+│   ├── ItemTemplates/                 (Item models for Backpack Checkpoint)
 │   └── GuideBooths/
 │       └── DefaultBooth (Model)
 │
 ├── StarterPlayerScripts/
 │   ├── ClientBootstrap.client.lua
-│   ├── Runner/
-│   │   ├── RunnerController.client.lua
+│   ├── Explorer/
+│   │   ├── ExplorerController.client.lua
 │   │   ├── PromptController.client.lua
-│   │   └── ObbyFeedbackController.client.lua
+│   │   └── NpcDescriptionCardController.client.lua
 │   ├── Guide/
 │   │   ├── GuideController.client.lua
 │   │   ├── GuideManualController.client.lua
-│   │   └── GuideControlsController.client.lua
+│   │   └── GuideAnnotationController.client.lua
 │   └── UI/
 │       ├── LobbyPairController.client.lua
 │       ├── RoleSelectController.client.lua
@@ -201,204 +237,181 @@ The actual Studio map may need to be built manually. See `human_todo.md`.
 ### Main Loop
 
 1. Players enter lobby.
-2. Two players pair up.
-3. They select or receive roles:
-   - Runner
-   - Guide
-4. Round starts.
-5. Runner enters obby.
-6. Guide enters control booth.
-7. The round loads 3-5 randomized rooms.
-8. Runner sees physical obstacles and choices.
-9. Guide sees clue cards, safety rules, and controls.
-10. Players communicate to solve rooms.
-11. They finish the run.
-12. Game calculates score:
-    - time
-    - mistakes
-    - trust points
-    - pause bonuses
-    - teamwork streak
-13. Players earn Trust Seeds.
-14. Trust Seeds upgrade/decorate the shared lobby treehouse/garden.
-15. Players replay for better ranks, faster times, and more cosmetics.
+2. Two players pair up via capsule pads or proximity-prompt invite.
+3. They pick (or are auto-assigned) one of:
+   - **Explorer**
+   - **Guide**
+4. Round starts. Server reserves a play arena slot, clones the level, teleports both players in.
+5. Explorer plays the level. Guide stays in the booth with the manual.
+6. They communicate to solve the level.
+7. Round ends.
+8. Score screen shows time, mistakes, Trust Seeds.
+9. Trust Seeds grow the shared lobby treehouse/garden.
+10. Players replay for better ranks.
+
+For the demo flow, a round plays **both** of the two MVP levels back-to-back: Stranger Danger Park, then Backpack Checkpoint. They are linked by a portal between play areas in the same slot.
 
 ### Roles
 
-#### Runner
+#### Explorer
 
-The Runner is the action player.
+The Explorer is the action / decision player.
 
 They:
-- run and jump through obby rooms
-- press buttons
-- choose doors
-- carry items
-- avoid traps
-- make final selections
+- walk around the world
+- meet NPCs and decide whether to engage
+- pick up and sort items
+- experience consequences (good or funny)
 
-The Runner should not have all the information.
+The Explorer does **not** have the safety rulebook.
 
 #### Guide
 
-The Guide is the support player.
+The Guide is stationed in a private booth attached to the duo's slot.
 
 They:
-- see clue cards
-- scan suspicious objects
-- activate bridge pieces
-- freeze hazards
-- read short parent-style prompts
-- guide the Runner through the room
+- have the manual of warning signs / safety rules for the active level
+- see the Explorer through a window or camera UI
+- describe risk to the Explorer over voice/chat
+- annotate or flag NPCs/items via UI for the Explorer to see
 
-The Guide should not physically solve the obby. Their job is to communicate and support.
+The Guide does **not** move through the level. Communication is the only way to coordinate.
 
-## MVP Rooms
+## MVP Levels
 
-For the hackathon MVP, prioritize 3 polished rooms over many half-built rooms.
+For the hackathon MVP we are shipping **2 super-polished levels**, not three minimum-viable ones. Judges said depth on two beats breadth on five. Cut every additional concept until both of these are demo-ready.
 
-### Room 1: Button Room
+### Level 1: Stranger Danger Park (headline level)
 
-Runner sees several tempting buttons.
+A small park / town plaza with ~6–8 NPCs. The duo has a friendly micro-quest framing — for example, **"find the lost puppy"** — that requires gathering 3 clues from NPCs. Some NPCs are safe to talk to. Some are not. The Guide has the manual; the Explorer is the only one who can actually approach.
 
-Examples:
-- FREE PET
-- SECRET PRIZE
-- OPEN GATE
-- FAST SHORTCUT
-- PASSWORD DOOR
-- DAILY REWARD
+#### Loop
 
-Guide sees which buttons are suspicious and which are safe.
+1. Explorer walks up to an NPC. ProximityPrompt: "Take a closer look".
+2. Server reveals the NPC's visible **traits** (location, clothing, what they're holding, body language) to both the Explorer (as a small description card) and the Guide (with manual cross-reference highlights).
+3. Guide consults the manual and tells the Explorer to approach or stay back.
+4. If the Explorer chooses to engage:
+   - **Safe NPC** → gives a clue or a fragment of the puppy's location.
+   - **Dangerous NPC** → consequence (NPC tries to lure Explorer / Explorer trips and runs back / mistake counter increments).
+5. Once 3 clues collected, a finish zone unlocks (e.g., the puppy appears at a fountain).
 
-Wrong buttons cause funny chaos:
-- slime splash
-- platform drops
-- chicken explosion
-- temporary slowdown
-- fake shortcut resets the player
+#### Guide manual entries (examples — keep tone friendly, kid-readable)
 
-Hidden lesson:
-- Pause before clicking.
-- Suspicious offers often use urgency, free rewards, or secrets.
+🚩 Risky signals:
+- Calling you over from a parked car
+- Asking you to come somewhere private or away from the crowd
+- Offering candy, free game items, or "a secret"
+- Asking your real name, school, or address
+- Standing alone in a place adults usually don't hang around
 
-### Room 2: Bridge Builder
+✅ Safer signals:
+- Behind a counter / register at a shop
+- Wearing a uniform or name tag
+- Helping multiple people, not just you
+- With family or kids in a busy public area
 
-Runner must cross gaps.
+#### Replayability
 
-Guide controls bridge segments from the booth.
+Each round randomizes:
+- Which NPCs are safe vs. dangerous
+- Which traits each NPC presents
+- Which safe NPCs hold which clues
+- The puppy's final hiding spot
 
-Guide must:
-- rotate bridge pieces
-- activate safe platforms
-- time moving pieces
-- warn Runner when to jump
+So the Guide can never just memorize "talk to the guy in the red hat". They must read the manual every run.
 
-Hidden lesson:
-- Trust and communication make progress possible.
+### Level 2: Backpack Checkpoint (shorter polish piece)
 
-### Room 3: Door Decoder
+A TSA-style sorting checkpoint. Items move down a conveyor belt one at a time. The Explorer must drop each item into one of three bins:
 
-Runner sees several doors with NPC messages.
+- ✅ **Pack It** (OK to share)
+- ⚠️ **Ask First** (gray area — ask a grownup)
+- ⛔ **Leave It** (keep private)
 
-Examples:
-- "Come alone for a secret prize."
-- "Tell me your real name first."
-- "Stay with your buddy and solve this puzzle."
-- "Click fast before time runs out."
+The Guide has the chart that says where each item belongs.
 
-Guide sees clue cards explaining which door is safest.
+The items are visual stand-ins for digital citizenship concepts but are themed as physical things, **without using direct labels like "your address"**. Examples:
 
-Hidden lesson:
-- Do not follow strangers privately.
-- Do not share personal info.
-- Ask someone you trust when something feels weird.
+- A glowing house model = home address → Leave It
+- A school crest banner = school name → Leave It
+- A padlock card = a password → Leave It
+- A phone with a number floating above it = phone number → Leave It
+- A name tag with a real name handwritten = real name → Ask First
+- A photo Polaroid of yourself = a personal photo → Ask First
+- A balloon with your birthdate = birthday → Ask First
+- A controller = favorite game → Pack It
+- A paint palette = favorite color → Pack It
+- A funny meme card = a joke / meme → Pack It
 
-### Optional Rooms After MVP
+#### Loop
 
-Only build these after the core game is fun.
+1. Item appears on conveyor.
+2. Explorer can pick it up and walk it to a bin OR press a corresponding button.
+3. Guide reads the chart, calls out the bin.
+4. Server validates the lane choice.
+   - Correct → trust points, next item.
+   - Wrong → item bounces back, mistake counter, friendly buzzer SFX.
+5. After N items, level completes.
 
-#### Privacy Gate
+This level is **shorter and tighter** than Stranger Danger Park. It exists to convey a second concept (privacy / digital citizenship) and to give the demo a satisfying second beat.
 
-Runner carries item cards through a gate.
+### Future / Cut Levels
 
-Items:
-- favorite color
-- username
-- home address
-- password
-- school name
-- favorite game
-- parent phone number
+We are explicitly not building these for MVP, but they live in `docs/GAME_DESIGN.md` so the team has the catalog ready if there's leftover time:
 
-Guide has a privacy chart:
-- okay to share
-- ask first
-- never share
-
-#### Kindness Chat Maze
-
-Runner opens doors by picking responses to NPC chat messages.
-
-Guide sees the emotional meter and recommended de-escalation hints.
-
-#### Rumor Relay
-
-Runner sees rumors changing between NPCs.
-
-Guide sees original source and helps Runner identify misinformation.
+- Bridge Builder (cooperation / timing)
+- Door Decoder (warning sign reading — overlaps with Stranger Danger)
+- Kindness Chat Maze (de-escalation)
+- Rumor Relay (misinformation)
 
 ## Game Design Rules
 
-### Rule 1: Fun First
+### Rule 1: Fun First, Educational Second
 
-Every room must be playable as a fun co-op game even without the lesson.
+Every level must be playable as a fun co-op game first. The lesson lives inside the mechanic — never on a popup.
 
 Bad:
 > "Answer this safety question to continue."
 
 Good:
-> "Your partner sees which button is safe, but you are the only one who can press it."
+> "Your buddy has the manual of warning signs. You're the only one who can actually walk up to the stranger."
 
 ### Rule 2: No Lectures
 
-Avoid long popups explaining online safety.
+No paragraphs of safety text. The manual the Guide reads is the only place rules appear, and it's framed as gameplay reference, not a lecture.
 
 Use:
 - short clue cards
 - environmental feedback
-- funny consequences
-- quick end-of-room recap only if needed
+- funny but not punishing consequences
+- a quick end-of-level recap line, max one sentence
 
 ### Rule 3: Education Through Mechanics
 
-Each lesson must be represented by an action.
+Each lesson must be represented by an action the Explorer takes.
 
 Examples:
-- Pause before clicking = waiting for Guide scan before pressing button
-- Trust parent = Runner asks Guide before choosing door
-- Safe communication = both players must coordinate bridge timing
-- Privacy = physically sorting items into safe/private baskets
+- Pause before talking to a stranger = waiting for the Guide's read on traits before triggering "Talk"
+- Don't share private info = literally tossing the "address" item into the Leave It bin
+- Trust your grownup = the level cannot be solved without listening to the Guide
 
 ### Rule 4: Replayability
 
-The game must support repeated runs.
+Even with only 2 levels, randomization is what makes it replayable.
 
 Use:
-- randomized room order
-- randomized button labels
-- randomized safe choices
-- timer
-- score ranks
+- randomized NPC traits / safe-vs-dangerous roles in Stranger Danger Park
+- randomized clue distribution
+- randomized item set in Backpack Checkpoint
+- timer + ranks
 - Trust Seeds
-- cosmetic unlocks
 - lobby/treehouse progression
 
 ### Rule 5: Asymmetric Co-op
 
-Runner and Guide must see different information.
+Explorer and Guide must see different information.
 
-If both players can solve the room alone, redesign the room.
+If a player can complete the level alone, redesign it. The Guide must always hold knowledge the Explorer needs.
 
 ## Core Engineering Principles
 
@@ -494,20 +507,20 @@ Suggested remotes:
 - `RoundStateUpdated`
 - `ReturnToLobby`
 
-### Runner Interactions
+### Explorer Interactions
 
-- `RequestPressButton`
-- `RequestChooseDoor`
-- `RequestUseInteractable`
-- `RunnerFeedback`
+- `RequestInspectNpc` (reveals NPC traits to both players)
+- `RequestTalkToNpc` (commits to engaging an NPC)
+- `RequestPickupItem` (Backpack Checkpoint)
+- `RequestPlaceItemInLane` (Backpack Checkpoint)
+- `ExplorerFeedback`
 
 ### Guide Controls
 
-- `RequestGuideScan`
-- `RequestActivateBridge`
-- `RequestFreezeHazard`
+- `RequestAnnotateNpc` (Guide flags an NPC as ✅/🚩 for Explorer's HUD)
+- `RequestAnnotateItem` (Guide flags item bin choice)
 - `GuideManualUpdated`
-- `GuideControlResult`
+- `GuideAnnotationResult`
 
 ### Scoring / Rewards
 
@@ -637,19 +650,18 @@ Claude should check this file before claiming a feature is fully complete.
 
 ## MVP Feature Checklist
 
-- Lobby with pairing flow
-- Runner/Guide role assignment
-- Guide booth
-- Round start and end flow
-- Button Room
-- Bridge Builder Room
-- Door Decoder Room
+- Lobby with pairing flow (capsules + proximity-prompt invites)
+- Explorer/Guide role assignment
+- Guide booth (instanced per duo)
+- Round start, level transition, and end flow
+- **Stranger Danger Park** — fully playable with randomized NPCs and clues
+- **Backpack Checkpoint** — fully playable with randomized item rotation
 - Timer and mistake counter
 - Score screen
 - Trust Seed reward
 - Basic lobby/treehouse progression
-- Polished demo-ready UI
-- Clear final pitch alignment with early learning and civility
+- Polished demo-ready UI (Cartoon font, friendly visuals)
+- Pitch script that lands the Learn-and-Explore framing without sounding like homework
 
 ## Important Files
 
