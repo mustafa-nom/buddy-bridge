@@ -140,6 +140,28 @@ def emit_lobby_lua(
             text_size=42,
         )
     )
+    # mission subtitle — the line the team built the game around. it sits
+    # below the welcome board so anyone walking up reads it before pairing.
+    p.line(
+        make_part(
+            "mission_face",
+            parent="lobby",
+            name="MissionBoard",
+            size=(11, 1.6, 0.3),
+            cframe=cframe_pos(ox, oy + 4, oz + 18),
+            color_rgb=PALETTE.sign_face,
+            material_name="Wood",
+        )
+    )
+    p.line(
+        make_billboard_gui(
+            "mission_gui",
+            adornee="mission_face",
+            text="Pause. Talk. Choose together.",
+            studs_offset_y=1.5,
+            text_size=28,
+        )
+    )
 
     # treehouse / garden decorative area — east of the spawn path
     p.line(make_model("treehouse", parent="lobby", name="Treehouse"))
