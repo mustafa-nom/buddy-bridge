@@ -310,7 +310,7 @@ local function handlePickupItem(player: Player, itemId: string)
 	if not okProx then return end
 
 	-- Mark held; the actual physical pickup happens client-side.
-	round.LevelState[LevelTypes.BackpackCheckpoint].HeldByPlayer = player
+	BackpackCheckpointLevel.MarkHeld(round, player)
 end
 
 local function handlePlaceItemInLane(player: Player, itemId: string, laneId: string)
@@ -344,21 +344,22 @@ local function handlePlaceItemInLane(player: Player, itemId: string, laneId: str
 	local okBin = RemoteValidation.RequireProximity(player, bin, Constants.BIN_RADIUS_STUDS)
 	if not okBin then return end
 
-	local accepted, correct = BackpackCheckpointLevel.HandleSort(round, itemId, laneId)
-	if not accepted then return end
-	if correct then
+	-- HandleSort returns (accepted, correct, reason).
+	--   accepted=true,  correct=true  → correct sort. WaveDirector advances
+	--                                    via the BeltController's OnResolved
+	--                                    callback; we just score.
+	--   accepted=false, reason="Locked"   → lane was still locked. No score
+	--                                    change; player got a Notify already.
+	--   accepted=false, reason="WrongLane" → wrong but unlocked. Mistake;
+	--                                    item bounces back on the belt.
+	local accepted, correct, reason = BackpackCheckpointLevel.HandleSort(round, itemId, laneId)
+	if accepted and correct then
 		round.ItemsSorted += 1
 		ScoringService.AddTrustPoints(round, Constants.TRUST_POINTS_PER_CORRECT_SORT, "Sort")
-		local hasNext = BackpackCheckpointLevel.AdvanceToNextItem(round)
-		if not hasNext then
-			-- Level complete
-			local LevelService = require(Services:WaitForChild("LevelService"))
-			LevelService.CompleteLevel(round, LevelTypes.BackpackCheckpoint)
-		end
-	else
+	elseif reason == "WrongLane" then
 		ScoringService.AddMistake(round, "WrongLane")
-		-- Bounce-back is a client-visual; server-side we leave activeItem unchanged.
 	end
+	-- "Locked" and any other reason: no scoring side effect.
 end
 
 function ExplorerInteractionService.Init()
