@@ -16,32 +16,34 @@ export type StrangerDangerFragment = {
 	Text: string,
 }
 
+export type StrangerDangerBadge = {
+	Color: string,
+	Shape: string,
+}
+
 export type StrangerDangerNpc = {
 	Id: string,
 	SpawnPointId: string,
 	Anchor: string?,
 	Archetype: string,             -- NPC template name (HotDogVendor, etc.)
-	Role: string,                  -- Risky | SafeWithClue | SafeNoClue
+	Role: string,                  -- Risky | Safe
 	Silhouette: StrangerDangerSilhouette,  -- Explorer-visible glance
-	Cues: { string },              -- Guide-visible cue tags (full info)
+	Cue: string,                   -- behavior cue revealed on inspect
+	Badge: StrangerDangerBadge,
+	Cues: { string },              -- legacy mirror for manual highlighting
 	Verdict: string,               -- canonical Approach/AskFirst/Avoid
-	Fragment: StrangerDangerFragment?,  -- truthful or misleading clue
 	Bark: string?,                 -- chat-bubble line
-	-- Legacy fields for backwards compatibility with existing renderers:
 	Traits: { string },            -- mirrors Cues for older callers
-	ClueText: string?,             -- mirrors Fragment.Text for older callers
 }
 
 export type StrangerDangerScenario = {
 	Type: string,
-	PuppySpawnId: string,
-	PuppyLandmark: string,         -- the truthful landmark fragments point to
 	Npcs: { StrangerDangerNpc },
+	AnswerBadges: { StrangerDangerBadge },
 	GuideManual: {
 		RiskyTags: { string },
 		SafeTags: { string },
 	},
-	Annotations: { [string]: string },
 }
 
 export type BackpackItem = {
@@ -66,8 +68,7 @@ export type BackpackCheckpointScenario = {
 }
 
 ScenarioTypes.NpcRoles = {
-	SafeWithClue = "SafeWithClue",
-	SafeNoClue = "SafeNoClue",
+	Safe = "Safe",
 	Risky = "Risky",
 }
 
@@ -79,9 +80,7 @@ ScenarioTypes.AnnotationMarkers = {
 }
 
 function ScenarioTypes.IsValidNpcRole(role: string?): boolean
-	return role == ScenarioTypes.NpcRoles.SafeWithClue
-		or role == ScenarioTypes.NpcRoles.SafeNoClue
-		or role == ScenarioTypes.NpcRoles.Risky
+	return role == ScenarioTypes.NpcRoles.Safe or role == ScenarioTypes.NpcRoles.Risky
 end
 
 function ScenarioTypes.IsValidAnnotationMarker(marker: string?): boolean

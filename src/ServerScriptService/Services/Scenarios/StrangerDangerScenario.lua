@@ -1,17 +1,5 @@
 --!strict
--- Generates a randomized scenario for Stranger Danger Park.
---
--- Each spawn point gets:
--- - an Archetype (which NPC template to clone there) chosen via the anchor's
---   bias toward Risky vs Safe
--- - a Role (Risky / SafeWithClue / SafeNoClue) decided after archetype
--- - 1-3 visible Cues drawn from the archetype's cue pool, full info for the
---   Guide's book
--- - a Silhouette (the one-line "what does the Explorer see at a glance")
--- - optional Fragment: truthful (safe) or misleading (risky) puppy clue
---
--- The Explorer never receives Cues directly — only Silhouette. Asymmetric
--- info is enforced server-side by ExplorerInteractionService.
+-- Generates Stranger Danger Park NPCs for the booth-submit redesign.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Modules = ReplicatedStorage:WaitForChild("Modules")
@@ -20,20 +8,14 @@ local TagQueries = require(Modules:WaitForChild("TagQueries"))
 local LevelTypes = require(Modules:WaitForChild("LevelTypes"))
 local PlayAreaConfig = require(Modules:WaitForChild("PlayAreaConfig"))
 local StrangerDangerLogic = require(Modules:WaitForChild("StrangerDangerLogic"))
-
+local BadgeConfig = require(Modules:WaitForChild("BadgeConfig"))
 local ScenarioTypes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ScenarioTypes"))
 
 local StrangerDangerScenario = {}
 
--- archetype catalog grouped by base risk so we can match anchor bias to
--- archetype options. one archetype per NPC template the map generator
--- builds. (kept in this file rather than the Logic module because the
--- *catalog* is server-authoritative — clients only need cue text/silhouettes.)
 local SAFE_ARCHETYPES = { "HotDogVendor", "Ranger", "ParentWithKid", "CasualParkGoer" }
 local RISKY_ARCHETYPES = { "VehicleLeaner", "HoodedAdult", "KnifeArchetype" }
 
--- anchor → preferred archetype map. when an anchor strongly fits a specific
--- archetype, use it directly; falls back to risk-pool random pick otherwise.
 local ANCHOR_FAVORITES = {
 	HotdogShop = { Safe = "HotDogVendor" },
 	GeneralStore = { Safe = "Ranger" },
@@ -46,14 +28,14 @@ local ANCHOR_FAVORITES = {
 }
 
 local ANCHOR_RISK_BIAS = {
-	HotdogShop = { Risky = 0, Safe = 5 },
-	GeneralStore = { Risky = 0, Safe = 5 },
-	WhiteVan = { Risky = 5, Safe = 0 },
-	AlleyMouth = { Risky = 5, Safe = 0 },
-	NorthSidewalk = { Risky = 1, Safe = 3 },
-	SouthSidewalk = { Risky = 1, Safe = 3 },
-	EastSidewalk = { Risky = 2, Safe = 3 },
-	WestSidewalk = { Risky = 2, Safe = 3 },
+	HotdogShop = 0,
+	GeneralStore = 0,
+	WhiteVan = 6,
+	AlleyMouth = 6,
+	NorthSidewalk = 1,
+	SouthSidewalk = 1,
+	EastSidewalk = 2,
+	WestSidewalk = 2,
 }
 
 local function shuffle<T>(list: { T }): { T }
@@ -65,8 +47,7 @@ local function shuffle<T>(list: { T }): { T }
 	return out
 end
 
-local function pickFromList<T>(list: { T }): T?
-	if #list == 0 then return nil end
+local function pickFromList<T>(list: { T }): T
 	return list[math.random(#list)]
 end
 
@@ -75,122 +56,89 @@ local function gatherSpawnPoints(levelModel: Model)
 	for _, part in ipairs(TagQueries.GetTaggedInside(levelModel, PlayAreaConfig.Tags.BuddyNpcSpawn)) do
 		if part:IsA("BasePart") then
 			local id = part:GetAttribute(PlayAreaConfig.Attributes.NpcSpawnId)
-			if typeof(id) ~= "string" then id = part:GetFullName() end
+			if typeof(id) ~= "string" then
+				id = part:GetFullName()
+			end
 			local anchor = part:GetAttribute(PlayAreaConfig.Attributes.Anchor)
-			if typeof(anchor) ~= "string" then anchor = nil end
+			if typeof(anchor) ~= "string" then
+				anchor = nil
+			end
 			table.insert(result, { Spawn = part, Id = id, Anchor = anchor })
 		end
 	end
 	return result
 end
 
--- pick risk classification per spawn. force at least 3 SafeWithClue slots
--- so triangulation always has 3 truthful fragments to hand out. ensure at
--- least 1 Risky so the Guide has something to flag.
 local function assignRoles(spawns)
-	local count = #spawns
-	local indexed = {}
+	local scored = {}
 	for i, spawn in ipairs(spawns) do
-		local bias = spawn.Anchor and ANCHOR_RISK_BIAS[spawn.Anchor] or { Risky = 1, Safe = 1 }
-		local riskyScore = (bias.Risky or 0) + math.random()
-		table.insert(indexed, { Index = i, RiskyScore = riskyScore })
+		local bias = spawn.Anchor and ANCHOR_RISK_BIAS[spawn.Anchor] or 1
+		table.insert(scored, {
+			Index = i,
+			Score = bias + math.random(),
+		})
 	end
-	table.sort(indexed, function(a, b) return a.RiskyScore > b.RiskyScore end)
+	table.sort(scored, function(a, b)
+		return a.Score > b.Score
+	end)
 
-	local target = {}
-	target.SafeWithClue = math.min(Constants.CLUES_TO_FIND, math.max(1, count - 3))
-	target.Risky = math.max(2, math.floor(count * 0.35))
-	target.SafeNoClue = math.max(0, count - target.SafeWithClue - target.Risky)
-	while target.SafeWithClue + target.SafeNoClue + target.Risky > count do
-		if target.SafeNoClue > 0 then target.SafeNoClue -= 1
-		elseif target.Risky > 1 then target.Risky -= 1
-		else target.SafeWithClue -= 1 end
-	end
-	while target.SafeWithClue + target.SafeNoClue + target.Risky < count do
-		target.SafeNoClue += 1
-	end
-
-	local roles = table.create(count, "")
-	for i = 1, target.Risky do
-		roles[indexed[i].Index] = ScenarioTypes.NpcRoles.Risky
-	end
-	for i = target.Risky + 1, target.Risky + target.SafeWithClue do
-		roles[indexed[i].Index] = ScenarioTypes.NpcRoles.SafeWithClue
-	end
-	for i = target.Risky + target.SafeWithClue + 1, count do
-		roles[indexed[i].Index] = ScenarioTypes.NpcRoles.SafeNoClue
+	local roles = table.create(#spawns, ScenarioTypes.NpcRoles.Safe)
+	for i = 1, math.min(Constants.STRANGER_DANGER_RISKY_COUNT, #scored) do
+		roles[scored[i].Index] = ScenarioTypes.NpcRoles.Risky
 	end
 	return roles
 end
 
 local function pickArchetype(role: string, anchor: string?): string
-	-- prefer the anchor's favorite for this risk side
 	local riskKey = role == ScenarioTypes.NpcRoles.Risky and "Risky" or "Safe"
 	if anchor then
-		local fav = ANCHOR_FAVORITES[anchor]
-		if fav and fav[riskKey] then
-			return fav[riskKey]
+		local favorite = ANCHOR_FAVORITES[anchor]
+		if favorite and favorite[riskKey] then
+			return favorite[riskKey]
 		end
 	end
 	local pool = role == ScenarioTypes.NpcRoles.Risky and RISKY_ARCHETYPES or SAFE_ARCHETYPES
-	return pickFromList(pool) or pool[1]
+	return pickFromList(pool)
 end
 
-local function pickPuppyLandmarkAndSpawn(levelModel: Model): (string, string)
-	local landmarks = StrangerDangerLogic.Landmarks
-	local landmark = landmarks[math.random(#landmarks)]
-	local candidates = TagQueries.GetTaggedInside(levelModel, PlayAreaConfig.Tags.PuppySpawn)
-	if #candidates == 0 then return landmark, "" end
-	local choice = candidates[math.random(#candidates)]
-	if not choice:IsA("BasePart") then return landmark, "" end
-	choice:SetAttribute("BB_PuppyChosen", true)
-	choice:SetAttribute("BB_PuppyLandmark", landmark)
-	return landmark, choice:GetFullName()
+local function pickCue(archetype: string): string
+	local cues = StrangerDangerLogic.PickCues(archetype, 3)
+	return cues[1] or "LingeringNoReason"
 end
 
 function StrangerDangerScenario.Generate(levelModel: Model): any?
-	if not levelModel then return nil end
 	local spawns = gatherSpawnPoints(levelModel)
-	if #spawns < 3 then
+	if #spawns < Constants.STRANGER_DANGER_RISKY_COUNT then
 		warn("StrangerDangerScenario: fewer than 3 BuddyNpcSpawn parts in level")
+		return nil
+	end
+	local allBadges = BadgeConfig.AllBadges()
+	if #spawns > #allBadges then
+		warn("StrangerDangerScenario: more NPCs than unique badge pairs")
 		return nil
 	end
 
 	local roles = assignRoles(spawns)
-	local landmark, puppySpawnId = pickPuppyLandmarkAndSpawn(levelModel)
+	local badges = shuffle(allBadges)
+	local npcs = {}
+	local answerBadges = {}
 
-	local npcs: { any } = {}
 	for i, spawn in ipairs(spawns) do
 		local role = roles[i]
 		local archetype = pickArchetype(role, spawn.Anchor)
 		local archetypeData = StrangerDangerLogic.Archetypes[archetype]
-		local cueCount = math.random(2, 3)
-		local cues = StrangerDangerLogic.PickCues(archetype, cueCount)
-		local verdict = StrangerDangerLogic.EvaluateVerdict(cues)
-
-		-- truthful fragments come from any safe NPC; misleading fragments
-		-- come from risky NPCs. SafeNoClue gets nothing.
-		local fragment: any? = nil
-		if role == ScenarioTypes.NpcRoles.SafeWithClue then
-			fragment = {
-				Truthful = true,
-				Landmark = landmark,
-				Text = StrangerDangerLogic.MakeTruthfulFragment(landmark),
-			}
-		elseif role == ScenarioTypes.NpcRoles.Risky then
-			fragment = {
-				Truthful = false,
-				Landmark = landmark,
-				Text = StrangerDangerLogic.MakeMisleadingFragment(landmark),
-			}
-		end
-
+		local cue = pickCue(archetype)
+		local badge = badges[i]
 		local silhouette = archetypeData and archetypeData.Silhouette or {
 			Headline = "Someone in the park",
 			Outline = "Person",
 			AccentColor = { 200, 200, 200 },
 			Stance = "Standing",
 		}
+
+		if role == ScenarioTypes.NpcRoles.Risky then
+			table.insert(answerBadges, badge)
+		end
 
 		table.insert(npcs, {
 			Id = string.format("npc_%d", i),
@@ -199,17 +147,17 @@ function StrangerDangerScenario.Generate(levelModel: Model): any?
 			Archetype = archetype,
 			Role = role,
 			Silhouette = silhouette,
-			Cues = cues,
-			Verdict = verdict,
-			Fragment = fragment,
+			Cue = cue,
+			Badge = badge,
+			Cues = { cue },
+			Verdict = role == ScenarioTypes.NpcRoles.Risky
+				and StrangerDangerLogic.Verdict.Avoid
+				or StrangerDangerLogic.Verdict.Approach,
 			Bark = archetypeData and archetypeData.Bark,
-			-- legacy mirrors
-			Traits = cues,
-			ClueText = fragment and fragment.Text,
+			Traits = { cue },
 		})
 	end
 
-	-- guide manual now lists every cue tag (the book has its own structure)
 	local riskyTags, safeTags = {}, {}
 	for tag, cue in pairs(StrangerDangerLogic.Cues) do
 		if cue.Risk < 0 then
@@ -221,14 +169,12 @@ function StrangerDangerScenario.Generate(levelModel: Model): any?
 
 	return {
 		Type = LevelTypes.StrangerDangerPark,
-		PuppySpawnId = puppySpawnId,
-		PuppyLandmark = landmark,
 		Npcs = npcs,
+		AnswerBadges = answerBadges,
 		GuideManual = {
 			RiskyTags = riskyTags,
 			SafeTags = safeTags,
 		},
-		Annotations = {},
 	}
 end
 

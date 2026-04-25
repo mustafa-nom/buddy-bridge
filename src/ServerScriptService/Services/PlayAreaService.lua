@@ -337,6 +337,28 @@ function PlayAreaService.TeleportGuideToBooth(round)
 	end
 end
 
+local function findLobbySpawn(): BasePart?
+	for _, instance in ipairs(Workspace:GetDescendants()) do
+		if instance:IsA("SpawnLocation") then
+			return instance
+		end
+	end
+	return nil
+end
+
+function PlayAreaService.TeleportPairToLobby(round)
+	local spawn = findLobbySpawn()
+	if not spawn then
+		return
+	end
+	if round.Explorer and round.Explorer.Parent then
+		teleportPlayerTo(round.Explorer, spawn)
+	end
+	if round.Guide and round.Guide.Parent and round.Guide ~= round.Explorer then
+		teleportPlayerTo(round.Guide, spawn)
+	end
+end
+
 function PlayAreaService.TeardownArenaForRound(round)
 	local fp = roundFootprints[round.RoundId]
 	if not fp then

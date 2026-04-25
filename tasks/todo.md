@@ -55,16 +55,16 @@ Build a polished MVP of Buddy Bridge with **2 levels**: Stranger Danger Park and
 
 ## Stranger Danger Park
 
-- [x] `Scenarios/StrangerDangerScenario.lua` — generate randomized NPC scenario with anchor bias
-- [x] `Levels/StrangerDangerLevel.lua` — clone NPCs, attach traits, attach knife accessory
-- [x] `ExplorerInteractionService.lua` — `RequestInspectNpc`, `RequestTalkToNpc`
-- [x] `GuideControlService.lua` — `RequestAnnotateNpc`
-- [x] `ExplorerController.client.lua` — handle proximity-based NPC inspect, talk follow-up
-- [x] `NpcDescriptionCardController.client.lua` — show trait card to Explorer + colored ring on annotation
-- [x] `GuideManualController.client.lua` — render trait/risk manual on booth SurfaceGui (with screen-space fallback)
-- [x] `GuideAnnotationController.client.lua` — annotation buttons
-- [x] Visual: colored ring around NPC when Guide annotates
-- [x] Quest: 3 clues → puppy spawn → level exit
+- [x] `Scenarios/StrangerDangerScenario.lua` — generate exactly 3 Risky NPCs with unique `(Color, Shape)` badges
+- [x] `Levels/StrangerDangerLevel.lua` — clone NPCs, attach badge SurfaceGuis, wire booth slots and submit pad
+- [x] `ExplorerInteractionService.lua` — `RequestInspectNpc` returns behavior cue + badge
+- [x] `GuideControlService.lua` — `RequestSetSlotBadge` + `RequestSubmitAccusation` validators
+- [x] `ExplorerController.client.lua` — handle proximity-based NPC inspect only
+- [x] `NpcDescriptionCardController.client.lua` — show behavior cue + badge to Explorer
+- [x] `GuideManualController.client.lua` — manual default-closed with toggle button
+- [x] `GuideBoothController.client.lua` — slot picker UI + per-slot display from `BoothStateUpdated`
+- [x] Visual: NPC badge SurfaceGui + booth slot/attempt SurfaceGuis
+- [x] Submit loop: green slots lock, red slots stay editable, 3 failed submits ends round
 - [ ] Test: full level playthrough with 2 players (HUMAN — needs Studio)
 
 ## Backpack Checkpoint
@@ -102,8 +102,8 @@ Build a polished MVP of Buddy Bridge with **2 levels**: Stranger Danger Park and
 
 ## Verification
 
-- [ ] `selene src/` passes (HUMAN — selene not installed locally)
-- [x] All files in `src/` under 500 lines (max: 384)
+- [ ] `selene src/` passes (BLOCKED locally — `selene` not on PATH; `aftman install` requires trusting `Kampfkarren/selene`)
+- [x] All files in `src/` under 500 lines (max: 397)
 - [x] All remotes validate input + role (canonical chain in Helpers/RemoteValidation)
 - [x] No client-side authoritative gameplay state
 - [ ] Tested with 2 players in Studio local server (HUMAN)

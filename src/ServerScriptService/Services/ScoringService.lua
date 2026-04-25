@@ -72,11 +72,12 @@ function ScoringService.NoteLevelComplete(round, levelType: string)
 end
 
 function ScoringService.CalculateFinalScore(round): { [string]: any }
+	local failed = round.LevelState.FailedRun == true
 	local total = round.TrustPoints - (round.Mistakes * ScoringConfig.MistakePenalty)
 	if total < 0 then
 		total = 0
 	end
-	local rank = ScoringConfig.RankFromScore(total)
+	local rank = failed and nil or ScoringConfig.RankFromScore(total)
 	local elapsed = os.clock() - round.StartedAt
 	local perfectLevels = 0
 	local levelBreakdown = {}
@@ -96,6 +97,7 @@ function ScoringService.CalculateFinalScore(round): { [string]: any }
 		RoundId = round.RoundId,
 		TotalScore = total,
 		Rank = rank,
+		Failed = failed,
 		Mistakes = round.Mistakes,
 		Elapsed = elapsed,
 		TrustPoints = round.TrustPoints,

@@ -107,6 +107,9 @@ function RoundService.EndRound(round, reason: string?)
 	if not round then return end
 	if not round.IsActive then return end
 	round.IsActive = false
+	if reason == "FailedStrangerDanger" then
+		round.LevelState.FailedRun = true
+	end
 
 	-- Compute final score and grant rewards before tearing down arena.
 	local finalScore = ScoringService.CalculateFinalScore(round)
@@ -131,6 +134,7 @@ function RoundService.EndRound(round, reason: string?)
 
 	-- Cleanup level state and play area
 	LevelService.CleanupForRound(round)
+	PlayAreaService.TeleportPairToLobby(round)
 	PlayAreaService.TeardownArenaForRound(round)
 
 	RoundContext.Unregister(round)

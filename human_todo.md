@@ -32,8 +32,7 @@ Claude should not mark related features complete until the human confirms these 
 - [ ] `PrimaryPart` set
 - [ ] `LevelEntry` part where Explorer spawns
 - [ ] 6–8 `BuddyNpcSpawn` parts each with unique `NpcSpawnId`
-- [ ] 4+ candidate `PuppySpawn` parts
-- [ ] `LevelExit` zone that fires when Explorer reaches the puppy
+- [ ] No puppy/clue exit wiring required; the Guide booth submit pad completes or fails this level
 - [ ] Themed but kid-friendly aesthetic (no horror)
 
 #### BackpackCheckpoint
@@ -46,7 +45,7 @@ Claude should not mark related features complete until the human confirms these 
 ### NPC Templates (in `ServerStorage/NpcTemplates`)
 
 - [ ] At least 6 visually distinct NPC rigs (different outfits — shop worker apron, police uniform, casual park goer, parent with stroller, etc.)
-- [ ] Each NPC has a head-mounted name/trait BillboardGui anchor (User 2 fills text at runtime)
+- [ ] Each NPC rig has `UpperTorso`, `Torso`, `HumanoidRootPart`, or `PrimaryPart` so scripts can attach the runtime badge SurfaceGui
 
 ### Item Templates (in `ServerStorage/ItemTemplates`)
 
@@ -56,6 +55,9 @@ Claude should not mark related features complete until the human confirms these 
 ### Booth Template (in `ServerStorage/GuideBooths`)
 
 - [ ] `DefaultBooth` Model with `PrimaryPart`, `GuideSpawn`, `ControlPanel` (with SurfaceGui anchor), and a `Window` (transparent part) facing the play area
+- [ ] 3 slot pedestal BaseParts tagged `BB_BoothSlot`, each with numeric attribute `BB_SlotIndex` = `1`, `2`, or `3`
+- [ ] 1 submit pad BasePart tagged `BB_BoothSubmit`
+- [ ] Slot pedestals and submit pad have enough top-face space for runtime SurfaceGui displays
 - [ ] No door — Guide cannot leave by walking
 
 ### Tags & Attributes Sanity Pass
@@ -69,7 +71,7 @@ Claude should not mark related features complete until the human confirms these 
 - [ ] Bright, kid-friendly color palette
 - [ ] Cartoon proportions
 - [ ] Signage at lobby capsules ("Buddy Pair 1", etc.)
-- [ ] SFX placeholders in `SoundService`: `ConfirmPair`, `RoundStart`, `LevelComplete`, `WrongSort`, `CorrectSort`, `ClueCollected`, `RiskyTalk`
+- [ ] SFX placeholders in `SoundService`: `ConfirmPair`, `RoundStart`, `LevelComplete`, `WrongSort`, `CorrectSort`, `RiskyTalk`
 
 ## Scripting (User 2 — see `prompts/user2_scripting_prompt.md`)
 
