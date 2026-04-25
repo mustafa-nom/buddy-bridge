@@ -52,7 +52,8 @@ def emit_play_arena_slots_lua(*, slot_count: int = 4) -> str:
         p.line(set_attribute(slot_var, Attributes.SLOT_INDEX, idx + 1))
 
         # ground plane sized to host both levels side by side (~150 studs of
-        # play area each plus the booth offset)
+        # play area each plus the booth offset). matches the lobby's warm
+        # sand floor so duo arenas feel like extensions of the main hub.
         p.line(
             make_part(
                 f"{slot_var}_floor",
@@ -60,8 +61,8 @@ def emit_play_arena_slots_lua(*, slot_count: int = 4) -> str:
                 name="GroundPlane",
                 size=(360, 2, 200),
                 cframe=cframe_pos(sx, base_y - 1, 0),
-                color_rgb=PALETTE.grass,
-                material_name="Grass",
+                color_rgb=PALETTE.sand_warm,
+                material_name="Sand",
             )
         )
 
@@ -111,7 +112,7 @@ def emit_play_arena_slots_lua(*, slot_count: int = 4) -> str:
                 name="SlotSignPole",
                 size=(0.6, 8, 0.6),
                 cframe=cframe_pos(sx - 100, base_y + 4, -42),
-                color_rgb=PALETTE.booth_trim,
+                color_rgb=PALETTE.cottage_trim,
                 material_name="Wood",
             )
         )

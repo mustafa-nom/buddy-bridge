@@ -76,6 +76,34 @@ class Palette:
     # warm gold for trophies, padlocks, brass accents
     gold: tuple[int, int, int] = (252, 208, 88)
 
+    # cartoon park aesthetic — matches the reference style guide:
+    # warm sandy ground, layered stylized trees, cottage huts with red roofs,
+    # polygonal stone path wedges. these tones replace the green grass field
+    # for the lobby + park while staying inside the saturated cartoon range.
+    sand_warm: tuple[int, int, int] = (218, 158, 86)
+    sand_dark: tuple[int, int, int] = (188, 124, 64)
+    cottage_wall: tuple[int, int, int] = (188, 132, 88)
+    cottage_trim: tuple[int, int, int] = (132, 84, 56)
+    cottage_door: tuple[int, int, int] = (96, 60, 44)
+    cottage_window: tuple[int, int, int] = (220, 232, 248)
+    roof_red: tuple[int, int, int] = (172, 64, 56)
+    roof_red_dark: tuple[int, int, int] = (132, 44, 40)
+    stone_path: tuple[int, int, int] = (208, 200, 184)
+    stone_path_dark: tuple[int, int, int] = (172, 164, 148)
+    tree_top_dark: tuple[int, int, int] = (52, 96, 60)
+    tree_top_mid: tuple[int, int, int] = (78, 132, 78)
+    tree_top_light: tuple[int, int, int] = (118, 168, 96)
+
+    # street + intersection palette for the new stranger-danger level. roads
+    # are dark concrete-grey with white crosswalk and yellow centerline paint;
+    # sidewalks are pale concrete with darker curb edges.
+    asphalt: tuple[int, int, int] = (62, 62, 66)
+    asphalt_dark: tuple[int, int, int] = (44, 44, 48)
+    crosswalk_paint: tuple[int, int, int] = (244, 244, 240)
+    road_yellow: tuple[int, int, int] = (240, 196, 64)
+    sidewalk: tuple[int, int, int] = (210, 206, 196)
+    curb: tuple[int, int, int] = (152, 148, 140)
+
 
 PALETTE = Palette()
 
@@ -99,6 +127,10 @@ DEFAULT_MATERIAL = "SmoothPlastic"
 GRASS_MATERIAL = "Grass"
 PATH_MATERIAL = "Sand"
 WOOD_MATERIAL = "Wood"
+
+# canonical "ground" material for the cartoon park aesthetic. lobbies and
+# stranger-danger areas paint with this so the floor reads as warm sand.
+GROUND_MATERIAL = "Sand"
 
 
 # the shared font for every billboard, sign, surface gui
@@ -143,6 +175,9 @@ class Tags:
     BUDDY_BIN = "BuddyBin"
     BUDDY_CONVEYOR = "BuddyConveyor"
     ROUND_FINISH_ZONE = "RoundFinishZone"
+    # tags walking NPCs that should patrol their assigned path
+    NPC_PATROL = "BuddyNpcPatrol"
+    NPC_PATROL_NODE = "BuddyPatrolNode"
 
 
 # canonical attributes — same single-source-of-truth principle.
@@ -156,6 +191,9 @@ class Attributes:
     LANE_ID = "LaneId"
     BELT_START = "BeltStart"
     BELT_END = "BeltEnd"
+    # patrol waypoint folder containing PATROL_NODE parts in walking order
+    PATROL_PATH = "PatrolPath"
+    PATROL_HOME = "PatrolHome"
 
 
 def color3(rgb: tuple[int, int, int]) -> str:
