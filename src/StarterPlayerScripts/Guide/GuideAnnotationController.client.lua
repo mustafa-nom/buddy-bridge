@@ -37,9 +37,9 @@ local function buildButtons()
 	local screen = UIBuilder.GetScreenGui()
 	panel = UIStyle.MakePanel({
 		Name = "GuideAnnotation",
-		Size = UDim2.new(0, 360, 0, 80),
+		Size = UDim2.new(0.188, 0, 0.074, 0),
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -16),
+		Position = UDim2.new(0.5, 0, 0.985, 0),
 		Parent = screen,
 	})
 	UIBuilder.PadLayout(panel :: Frame, 8)
@@ -53,7 +53,7 @@ local function buildButtons()
 
 	local function makeBtn(label: string, color: Color3, onClick: () -> ())
 		local btn = UIStyle.MakeButton({
-			Size = UDim2.new(0, 70, 1, 0),
+			Size = UDim2.new(0.194, 0, 1, 0),
 			Text = label,
 			BackgroundColor3 = color,
 			TextSize = UIStyle.TextSize.Body,

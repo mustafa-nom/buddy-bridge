@@ -37,38 +37,38 @@ local function showCapsuleConfirm(payload)
 	local screen = UIBuilder.GetScreenGui()
 	local frame = UIStyle.MakePanel({
 		Name = "CapsuleConfirm",
-		Size = UDim2.new(0, 360, 0, 180),
+		Size = UDim2.new(0.188, 0, 0.167, 0),
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -40),
+		Position = UDim2.new(0.5, 0, 0.963, 0),
 		Parent = screen,
 	})
 	UIBuilder.PadLayout(frame, 16)
 
 	local title = UIStyle.MakeLabel({
-		Size = UDim2.new(1, 0, 0, 32),
+		Size = UDim2.new(1, 0, 0.178, 0),
 		Text = "Buddy ready!",
 		TextSize = UIStyle.TextSize.Heading,
 	})
 	title.Parent = frame
 
 	local subtitle = UIStyle.MakeLabel({
-		Size = UDim2.new(1, 0, 0, 28),
-		Position = UDim2.new(0, 0, 0, 36),
+		Size = UDim2.new(1, 0, 0.156, 0),
+		Position = UDim2.new(0, 0, 0.2, 0),
 		Text = ("%s wants to play with you."):format(payload.Partner or "Someone"),
 		TextSize = UIStyle.TextSize.Body,
 	})
 	subtitle.Parent = frame
 
 	local confirm = UIStyle.MakeButton({
-		Size = UDim2.new(0.5, -8, 0, 60),
-		Position = UDim2.new(0, 0, 1, -68),
+		Size = UDim2.new(0.48, 0, 0.333, 0),
+		Position = UDim2.new(0, 0, 0.622, 0),
 		Text = "Confirm Pair",
 	})
 	confirm.Parent = frame
 
 	local cancel = UIStyle.MakeButton({
-		Size = UDim2.new(0.5, -8, 0, 60),
-		Position = UDim2.new(0.5, 8, 1, -68),
+		Size = UDim2.new(0.48, 0, 0.333, 0),
+		Position = UDim2.new(0.52, 0, 0.622, 0),
 		Text = "Step off",
 		BackgroundColor3 = UIStyle.Palette.PanelStroke,
 	})
@@ -89,31 +89,31 @@ local function showInvite(payload)
 	local screen = UIBuilder.GetScreenGui()
 	local frame = UIStyle.MakePanel({
 		Name = "InviteReceived",
-		Size = UDim2.new(0, 360, 0, 180),
+		Size = UDim2.new(0.188, 0, 0.167, 0),
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -40),
+		Position = UDim2.new(0.5, 0, 0.963, 0),
 		Parent = screen,
 	})
 	UIBuilder.PadLayout(frame, 16)
 
 	local title = UIStyle.MakeLabel({
-		Size = UDim2.new(1, 0, 0, 32),
+		Size = UDim2.new(1, 0, 0.178, 0),
 		Text = ("%s invited you!"):format(payload.FromName or "Someone"),
 		TextSize = UIStyle.TextSize.Heading,
 	})
 	title.Parent = frame
 
 	local accept = UIStyle.MakeButton({
-		Size = UDim2.new(0.5, -8, 0, 60),
-		Position = UDim2.new(0, 0, 1, -68),
+		Size = UDim2.new(0.48, 0, 0.333, 0),
+		Position = UDim2.new(0, 0, 0.622, 0),
 		Text = "Accept",
 		BackgroundColor3 = UIStyle.Palette.Safe,
 	})
 	accept.Parent = frame
 
 	local decline = UIStyle.MakeButton({
-		Size = UDim2.new(0.5, -8, 0, 60),
-		Position = UDim2.new(0.5, 8, 1, -68),
+		Size = UDim2.new(0.48, 0, 0.333, 0),
+		Position = UDim2.new(0.52, 0, 0.622, 0),
 		Text = "No thanks",
 		BackgroundColor3 = UIStyle.Palette.PanelStroke,
 	})
@@ -186,7 +186,7 @@ RemoteService.OnClientEvent("InviteReceived", function(payload)
 	showInvite(payload)
 end)
 
-RemoteService.OnClientEvent("PairAssigned", function(payload)
+RemoteService.OnClientEvent("PairAssigned", function(_payload)
 	clearCapsulePrompt()
 	clearInvitePrompt()
 	UIBuilder.Toast("You're paired up! Pick your role.", 3, "Success")

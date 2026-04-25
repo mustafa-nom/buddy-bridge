@@ -59,9 +59,11 @@ local function makeItemPlaceholder(itemKey: string, parent: Instance): Model
 	part.Parent = model
 	model.PrimaryPart = part
 	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.new(0, 160, 0, 40)
+	billboard.Size = UDim2.new(4.8, 0, 1.35, 0)
 	billboard.AlwaysOnTop = true
-	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+	billboard.LightInfluence = 0
+	billboard.MaxDistance = 90
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, 2.75, 0)
 	billboard.Parent = part
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.new(1, 0, 1, 0)
@@ -69,7 +71,7 @@ local function makeItemPlaceholder(itemKey: string, parent: Instance): Model
 	label.BackgroundColor3 = Color3.fromRGB(255, 248, 232)
 	label.TextColor3 = Color3.fromRGB(60, 40, 20)
 	label.Font = Enum.Font.Cartoon
-	label.TextSize = 18
+	label.TextScaled = true
 	label.Text = itemKey
 	label.Parent = billboard
 	model.Parent = parent
