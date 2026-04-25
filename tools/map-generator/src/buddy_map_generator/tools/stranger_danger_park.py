@@ -210,20 +210,25 @@ def _emit_sidewalks(p: LuaProgram, base_y: float) -> None:
                 material_name="Concrete",
             )
         )
-    # curbs running along the road edges — slightly raised dark strips
+    # curbs running along the road edges — slightly raised dark strips. lua
+    # identifiers can't contain '-' so each (sign_x, sign_z) gets a tag like
+    # "neg_pos" rather than embedding the raw signs into the var name.
     curb_thickness = 0.4
     curb_h = 0.4
     edge_len = far - half
     for sign_x in (-1, 1):
         for sign_z in (-1, 1):
+            tag_x = "neg" if sign_x < 0 else "pos"
+            tag_z = "neg" if sign_z < 0 else "pos"
+            label = f"{tag_x}_{tag_z}"
             # vertical curb between corner and intersection along z
             cz = sign_z * (half + edge_len / 2)
             cx = sign_x * (half - curb_thickness / 2)
             p.line(
                 make_part(
-                    f"curb_v_{sign_x}_{sign_z}",
+                    f"curb_v_{label}",
                     parent="streets",
-                    name=f"CurbV_{sign_x}_{sign_z}",
+                    name=f"CurbV_{label}",
                     size=(curb_thickness, curb_h, edge_len),
                     cframe=cframe_pos(cx, base_y + 0.7, cz),
                     color_rgb=PALETTE.curb,
@@ -235,9 +240,9 @@ def _emit_sidewalks(p: LuaProgram, base_y: float) -> None:
             cx2 = sign_x * (half + edge_len / 2)
             p.line(
                 make_part(
-                    f"curb_h_{sign_x}_{sign_z}",
+                    f"curb_h_{label}",
                     parent="streets",
-                    name=f"CurbH_{sign_x}_{sign_z}",
+                    name=f"CurbH_{label}",
                     size=(edge_len, curb_h, curb_thickness),
                     cframe=cframe_pos(cx2, base_y + 0.7, cz2),
                     color_rgb=PALETTE.curb,
