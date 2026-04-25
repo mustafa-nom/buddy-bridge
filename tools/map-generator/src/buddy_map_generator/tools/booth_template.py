@@ -247,6 +247,76 @@ def emit_booth_template_lua() -> str:
         )
     )
 
+    # window flower box — wraps the front window in cabin charm
+    p.line(
+        make_part(
+            "window_box",
+            parent="booth",
+            name="WindowBox",
+            size=(6.4, 0.6, 1),
+            cframe=cframe_pos(0, 1.8, 6.4),
+            color_rgb=PALETTE.wood_dark,
+            material_name="Wood",
+        )
+    )
+    flower_colors = [
+        (236, 110, 110),
+        (252, 208, 88),
+        (132, 200, 255),
+        (220, 158, 255),
+    ]
+    for i, fx in enumerate((-2.4, -0.8, 0.8, 2.4)):
+        p.line(
+            make_part(
+                f"window_flower_{i}",
+                parent="booth",
+                name=f"WindowFlower{i}",
+                size=(0.9, 0.9, 0.9),
+                cframe=cframe_pos(fx, 2.4, 6.4),
+                color_rgb=flower_colors[i % len(flower_colors)],
+                material_name="SmoothPlastic",
+                shape="Ball",
+            )
+        )
+
+    # doormat — at the booth's front edge so the entry threshold reads.
+    # the booth is windowed but not door-mat-less; this is a visual cue.
+    p.line(
+        make_part(
+            "doormat",
+            parent="booth",
+            name="Doormat",
+            size=(4, 0.2, 1.6),
+            cframe=cframe_pos(0, 0.5, 6.6),
+            color_rgb=PALETTE.bench_wood,
+            material_name="Wood",
+        )
+    )
+
+    # roof trim — a darker beam under the eaves
+    p.line(
+        make_part(
+            "roof_trim_front",
+            parent="booth",
+            name="RoofTrimFront",
+            size=(13, 0.4, 0.5),
+            cframe=cframe_pos(0, 8.4, 6.5),
+            color_rgb=PALETTE.wood_dark,
+            material_name="Wood",
+        )
+    )
+    p.line(
+        make_part(
+            "roof_trim_back",
+            parent="booth",
+            name="RoofTrimBack",
+            size=(13, 0.4, 0.5),
+            cframe=cframe_pos(0, 8.4, -6.5),
+            color_rgb=PALETTE.wood_dark,
+            material_name="Wood",
+        )
+    )
+
     p.note("DefaultBooth template built")
     p.created("GuideBooths/DefaultBooth")
     return p.render()
