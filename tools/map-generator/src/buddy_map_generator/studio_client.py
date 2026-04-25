@@ -199,8 +199,21 @@ class StudioClient:
                 if msg.get("id") == request_id:
                     if "error" in msg:
                         err = msg["error"]
+                        message = str(err.get("message", ""))
+                        # the boshyxd backend surfaces "Studio plugin connection
+                        # timeout" when the plugin isn't connected. translate
+                        # to actionable guidance instead of leaving the caller
+                        # to guess what to fix.
+                        if "plugin connection timeout" in message.lower():
+                            raise StudioClientError(
+                                f"{name} failed: studio plugin not connected. "
+                                f"open the place file in roblox studio with the "
+                                f"backend's plugin enabled (boshyxd MCPPlugin.rbxmx "
+                                f"or rbx-studio-mcp's MCPStudioPlugin.rbxm), and "
+                                f"verify allow-http-requests is on in security."
+                            )
                         raise StudioClientError(
-                            f"{name} failed: {err.get('message')} ({err.get('code')})"
+                            f"{name} failed: {message} ({err.get('code')})"
                         )
                     return msg.get("result", {})
 
