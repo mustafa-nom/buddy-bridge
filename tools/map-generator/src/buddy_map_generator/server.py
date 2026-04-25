@@ -1,9 +1,11 @@
 """buddy-map-generator MCP server.
 
-exposes high-level tools that emit Lua and forward it to rbx-studio-mcp.
-the studio plugin must be running for the tools that touch Studio; the
-"dry_run" variants return the emitted Lua as text without contacting Studio,
-which is useful for testing offline.
+exposes high-level tools that emit Lua and forward it through a roblox-studio
+backend (boshyxd robloxstudio-mcp by default; rbx-studio-mcp via
+BUDDY_STUDIO_BACKEND=rbx-studio). the studio plugin must be running for
+tools that touch Studio. set BUDDY_MAP_DRY_RUN=1 to return the emitted Lua
+instead of contacting Studio. set BUDDY_MAP_DRY_RUN=1 + dump_preliminary_map
+to write a single combined Lua program to disk for command-bar paste.
 """
 
 from __future__ import annotations
@@ -149,6 +151,73 @@ def screenshot() -> dict[str, Any]:
     if _dry_run():
         return {"mode": "dry_run", "label": "screenshot", "note": "would call capture_screenshot"}
     return {"mode": "studio", "label": "screenshot", "result": _state.client.capture_screenshot()}
+
+
+def _compose_preliminary_steps(
+    *, pair_count: int = 4, slot_count: int = 4
+) -> list[tuple[str, str]]:
+    """return [(label, lua), ...] for the full preliminary build, in order.
+
+    pure: doesn't touch Studio, doesn't depend on mcp. usable by tests and
+    by the dump_preliminary_map tool.
+    """
+    return [
+        ("build_lobby", emit_lobby_lua(pair_count=pair_count)),
+        ("build_play_arena_slots", emit_play_arena_slots_lua(slot_count=slot_count)),
+        ("build_booth_template", emit_booth_template_lua()),
+        ("build_stranger_danger_park", emit_stranger_danger_park_lua()),
+        ("build_backpack_checkpoint", emit_backpack_checkpoint_lua()),
+        ("build_npc_templates", emit_npc_templates_lua()),
+        ("build_item_templates", emit_item_templates_lua()),
+        ("build_polish_pass", emit_polish_pass_lua()),
+        ("verify_style", emit_verify_style_lua()),
+    ]
+
+
+def _default_dump_path() -> str:
+    """resolve the dump path relative to the map-generator package root.
+
+    package layout: <repo>/tools/map-generator/src/buddy_map_generator/...
+    we want: <repo>/tools/map-generator/out/preliminary_map.lua
+    """
+    here = os.path.dirname(os.path.abspath(__file__))  # .../buddy_map_generator
+    pkg_root = os.path.normpath(os.path.join(here, "..", ".."))  # .../map-generator
+    return os.path.join(pkg_root, "out", "preliminary_map.lua")
+
+
+@mcp.tool()
+def dump_preliminary_map(
+    pair_count: int = 4,
+    slot_count: int = 4,
+    output_path: str = "",
+) -> dict[str, Any]:
+    """write a single concatenated lua program for command-bar paste.
+
+    each section gets a `-- ===== <step> =====` header so you can see where
+    one ends and the next begins. paste the whole file into studio's command
+    bar (or `loadstring(file)()` from a plugin) and the entire map
+    materializes.
+
+    if output_path is empty, defaults to map-generator/out/preliminary_map.lua
+    relative to the package root (cwd-independent).
+    """
+    steps = _compose_preliminary_steps(pair_count=pair_count, slot_count=slot_count)
+    parts: list[str] = []
+    for label, lua in steps:
+        parts.append(f"-- ===== {label} =====\n{lua}\n")
+    program = "\n".join(parts)
+
+    abs_path = os.path.abspath(output_path) if output_path else _default_dump_path()
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+    with open(abs_path, "w") as f:
+        f.write(program)
+
+    return {
+        "mode": "dump",
+        "path": abs_path,
+        "step_count": len(steps),
+        "char_count": len(program),
+    }
 
 
 @mcp.tool()

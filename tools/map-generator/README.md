@@ -69,10 +69,14 @@ in the project dir picks it up automatically alongside the official
 - `build_item_templates` — 13 cartoon item models named per gameplay spec
 - `build_booth_template` — cozy lookout-cabin guide booth
 - `build_polish_pass` — lighting, atmosphere, sfx placeholders
-- `verify_style` — walks the map and reports material / font / tag drift
+- `verify_style` — walks the map and reports material / font / tag /
+  structural drift
 - `screenshot` — captures the studio window
 - `build_preliminary_map(...)` — runs every step in order, screenshots after
   each step
+- `dump_preliminary_map(...)` — concatenates every emitter into one labelled
+  lua file (default: `out/preliminary_map.lua`). paste into studio's command
+  bar to materialize the entire map in one shot — no mcp client required
 
 ### dry-run mode
 

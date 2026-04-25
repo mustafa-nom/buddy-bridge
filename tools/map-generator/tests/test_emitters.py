@@ -341,5 +341,37 @@ class StyleConsistencyTest(unittest.TestCase):
                         self.assertIn("Enum.Font.Cartoon", line)
 
 
+class OrchestratorTest(unittest.TestCase):
+    """compose_preliminary_steps must yield exactly the 9 expected sections."""
+
+    def test_nine_steps_in_order(self) -> None:
+        # importing server.py requires the mcp package; skip if absent so the
+        # contract tests still run on minimal environments (e.g. cloud routine).
+        try:
+            from buddy_map_generator.server import _compose_preliminary_steps
+        except ImportError:
+            self.skipTest("mcp package not installed; skipping orchestrator test")
+
+        steps = _compose_preliminary_steps(pair_count=4, slot_count=4)
+        labels = [label for label, _ in steps]
+        self.assertEqual(
+            labels,
+            [
+                "build_lobby",
+                "build_play_arena_slots",
+                "build_booth_template",
+                "build_stranger_danger_park",
+                "build_backpack_checkpoint",
+                "build_npc_templates",
+                "build_item_templates",
+                "build_polish_pass",
+                "verify_style",
+            ],
+        )
+        for label, lua in steps:
+            with self.subTest(step=label):
+                self.assertGreater(len(lua), 100, f"{label} emitted nothing")
+
+
 if __name__ == "__main__":
     unittest.main()
