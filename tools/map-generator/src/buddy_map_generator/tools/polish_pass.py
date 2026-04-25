@@ -29,6 +29,17 @@ def emit_polish_pass_lua() -> str:
     p = LuaProgram()
     p.comment("buddy bridge polish pass — lighting + sfx placeholders")
 
+    # ensure http requests are enabled — the analytics service plus the
+    # robloxstudio-mcp plugin both rely on this. studio's experience
+    # settings normally hold the canonical value, but setting it here makes
+    # the place file self-contained.
+    p.line(
+        "do\n"
+        "  local http = game:GetService(\"HttpService\")\n"
+        "  pcall(function() http.HttpEnabled = true end)\n"
+        "end"
+    )
+
     # lighting — warm cartoon daylight
     sky = PALETTE.sky_warm
     p.line(
