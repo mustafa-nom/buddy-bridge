@@ -190,6 +190,166 @@ def make_disc(
     return "\n".join(lines)
 
 
+def make_wedge(
+    var_name: str,
+    *,
+    parent: str,
+    name: str,
+    size: tuple[float, float, float],
+    cframe: str,
+    color_rgb: tuple[int, int, int] | None = None,
+    material_name: str = DEFAULT_MATERIAL,
+    transparency: float = 0,
+    can_collide: bool = True,
+    anchored: bool = True,
+    cast_shadow: bool = True,
+) -> str:
+    """emit a WedgePart — used for pitched roofs and polygonal stones."""
+    sx, sy, sz = size
+    color = color3(color_rgb) if color_rgb is not None else color3(PALETTE.grass)
+    lines = [
+        f"local {var_name} = Instance.new(\"WedgePart\")",
+        f"{var_name}.Name = {lua_string(name)}",
+        f"{var_name}.Size = Vector3.new({sx}, {sy}, {sz})",
+        f"{var_name}.CFrame = {cframe}",
+        f"{var_name}.Color = {color}",
+        f"{var_name}.Material = {material(material_name)}",
+        f"{var_name}.Anchored = {str(anchored).lower()}",
+        f"{var_name}.CanCollide = {str(can_collide).lower()}",
+        f"{var_name}.Transparency = {transparency}",
+        f"{var_name}.CastShadow = {str(cast_shadow).lower()}",
+        f"{var_name}.Parent = {parent}",
+    ]
+    return "\n".join(lines)
+
+
+def make_decal(
+    var_name: str,
+    *,
+    parent: str,
+    name: str,
+    texture_id: str,
+    face: str = "Front",
+    color_rgb: tuple[int, int, int] | None = None,
+    transparency: float = 0,
+) -> str:
+    """attach a Decal — typically a roblox face on an npc head.
+
+    `texture_id` should be a "rbxasset://..." or "rbxassetid://..." string.
+    """
+    parts = [
+        f"local {var_name} = Instance.new(\"Decal\")",
+        f"{var_name}.Name = {lua_string(name)}",
+        f"{var_name}.Texture = {lua_string(texture_id)}",
+        f"{var_name}.Face = Enum.NormalId.{face}",
+        f"{var_name}.Transparency = {transparency}",
+    ]
+    if color_rgb is not None:
+        parts.append(f"{var_name}.Color3 = {color3(color_rgb)}")
+    parts.append(f"{var_name}.Parent = {parent}")
+    return "\n".join(parts)
+
+
+def make_humanoid(
+    var_name: str,
+    *,
+    parent: str,
+    rig_type: str = "R6",
+    walk_speed: float = 8,
+    health: float = 100,
+    display_name: str | None = None,
+) -> str:
+    """create a Humanoid configured for an R6 rig.
+
+    R6 is required for the simplified 6-part body the npc emitter builds. the
+    server-side patrol script drives walking via Humanoid:MoveTo.
+    """
+    lines = [
+        f"local {var_name} = Instance.new(\"Humanoid\")",
+        f"{var_name}.RigType = Enum.HumanoidRigType.{rig_type}",
+        f"{var_name}.WalkSpeed = {walk_speed}",
+        f"{var_name}.MaxHealth = {health}",
+        f"{var_name}.Health = {health}",
+        f"{var_name}.AutoRotate = true",
+    ]
+    if display_name is not None:
+        lines.append(f"{var_name}.DisplayName = {lua_string(display_name)}")
+    lines.append(f"{var_name}.Parent = {parent}")
+    return "\n".join(lines)
+
+
+def make_motor6d(
+    var_name: str,
+    *,
+    parent: str,
+    name: str,
+    part0: str,
+    part1: str,
+    c0: str = "CFrame.new()",
+    c1: str = "CFrame.new()",
+) -> str:
+    """create a Motor6D welding two parts. R6 rigs use Motor6Ds in Torso to
+    drive arm/leg/head animation. c0/c1 are local CFrame offsets.
+    """
+    return "\n".join(
+        [
+            f"local {var_name} = Instance.new(\"Motor6D\")",
+            f"{var_name}.Name = {lua_string(name)}",
+            f"{var_name}.Part0 = {part0}",
+            f"{var_name}.Part1 = {part1}",
+            f"{var_name}.C0 = {c0}",
+            f"{var_name}.C1 = {c1}",
+            f"{var_name}.Parent = {parent}",
+        ]
+    )
+
+
+def make_clothing(
+    var_name: str,
+    *,
+    parent: str,
+    kind: str,
+    asset_id: str,
+) -> str:
+    """attach Shirt or Pants to a character model with an asset id placeholder."""
+    if kind not in ("Shirt", "Pants"):
+        raise ValueError("kind must be 'Shirt' or 'Pants'")
+    template_prop = "ShirtTemplate" if kind == "Shirt" else "PantsTemplate"
+    return "\n".join(
+        [
+            f"local {var_name} = Instance.new({lua_string(kind)})",
+            f"{var_name}.{template_prop} = {lua_string(asset_id)}",
+            f"{var_name}.Parent = {parent}",
+        ]
+    )
+
+
+def make_script(
+    var_name: str,
+    *,
+    parent: str,
+    name: str,
+    source: str,
+    is_local: bool = False,
+) -> str:
+    """embed a Script (or LocalScript) with full source. set via plugin write
+    so it persists into the saved place file. source is wrapped in a long
+    bracket lua literal to avoid escaping headaches.
+    """
+    cls = "LocalScript" if is_local else "Script"
+    delim = "==" if "]==]" in source else "="
+    while f"]{delim}]" in source:
+        delim += "="
+    return "\n".join(
+        [
+            f"local {var_name} = Instance.new({lua_string(cls)})",
+            f"{var_name}.Name = {lua_string(name)}",
+            f"{var_name}.Source = [{delim}[\n{source}\n]{delim}]",
+            f"{var_name}.Parent = {parent}",
+        ]
+    )
+
+
 def make_folder(var_name: str, *, parent: str, name: str) -> str:
     return "\n".join(
         [

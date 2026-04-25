@@ -48,12 +48,14 @@ ITEM_KEYS = {
 }
 
 PARK_SCENE_ANCHORS = {
-    "HotdogStand",
-    "Playground",
+    "HotdogShop",
+    "GeneralStore",
     "WhiteVan",
-    "AlleyBehindShop",
-    "RangerBooth",
-    "BenchFountain",
+    "AlleyMouth",
+    "NorthSidewalk",
+    "SouthSidewalk",
+    "EastSidewalk",
+    "WestSidewalk",
 }
 
 LANE_IDS = {"PackIt", "AskFirst", "LeaveIt"}
@@ -194,6 +196,18 @@ class StrangerDangerParkContractTest(unittest.TestCase):
     def test_anchor_attribute(self) -> None:
         self.assertIn('"Anchor"', self.lua)
 
+    def test_intersection_streets_present(self) -> None:
+        # the new aesthetic builds an asphalt + crosswalk intersection
+        self.assertIn("RoadNS", self.lua)
+        self.assertIn("RoadEW", self.lua)
+        self.assertIn("Crosswalk", self.lua)
+        self.assertIn("Sidewalk", self.lua)
+
+    def test_patrol_paths_folder(self) -> None:
+        # walking npcs need a patrol path waypoint folder per spawn anchor
+        self.assertIn("PatrolPaths", self.lua)
+        self.assertIn("BuddyPatrolNode", self.lua)
+
 
 class BackpackCheckpointContractTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -261,6 +275,24 @@ class NpcTemplatesContractTest(unittest.TestCase):
 
     def test_humanoid_root_part_per_npc(self) -> None:
         self.assertGreaterEqual(self.lua.count("HumanoidRootPart"), 7)
+
+    def test_r6_rig_type(self) -> None:
+        # the npc rigs must be R6 so default character anatomy + Motor6Ds work
+        self.assertIn("Enum.HumanoidRigType.R6", self.lua)
+
+    def test_face_decal_per_npc(self) -> None:
+        # every npc has a face decal placeholder so user 2 can swap visually
+        self.assertGreaterEqual(self.lua.count('Instance.new("Decal")'), 7)
+
+    def test_shirt_and_pants_slots(self) -> None:
+        self.assertIn("ShirtTemplate", self.lua)
+        self.assertIn("PantsTemplate", self.lua)
+
+    def test_patrol_script_embedded(self) -> None:
+        # each rig embeds a PatrolScript that drives the rig via humanoid:MoveTo
+        self.assertIn("PatrolScript", self.lua)
+        self.assertIn("humanoid:MoveTo", self.lua)
+        self.assertIn("MoveToFinished", self.lua)
 
 
 class BoothTemplateContractTest(unittest.TestCase):

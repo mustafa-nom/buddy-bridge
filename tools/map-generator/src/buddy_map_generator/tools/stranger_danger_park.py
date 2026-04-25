@@ -1,16 +1,16 @@
-"""build_stranger_danger_park: park level template under ServerStorage.Levels.
+"""build_stranger_danger_park: 4-way street intersection level.
 
-scene anchors (judge andrew's "different backgrounds and scenes"):
-- hot dog stand (safe archetype)
-- playground (safe archetype — parent with kids)
-- white van (risky archetype)
-- alley behind a shop (risky archetype)
-- ranger booth (safe archetype)
-- public bench / fountain (neutral / safe)
+reframed for the new visual style: instead of a green park, the level is a
+cartoon city block with two roads crossing in a + shape. asphalt, sidewalks,
+crosswalks, lane paint, plus four corner buildings — a hot dog shop, a
+ranger/general store, an alley cluster, and a parked white van. NPCs walk
+patrol routes around the intersection so the scene reads as alive, not
+posed. server-side scenario logic still randomizes which NPCs are safe vs
+risky each round; the geometry stays put.
 
-each anchor gets a distinct visible identity so the level reads as a series
-of recognizable vignettes. server-side scenario logic randomizes which
-NPCs go where each round; the geometry stays put.
+map object conventions remain: ServerStorage.Levels.StrangerDangerPark
+with PrimaryPart, LevelEntry, LevelExit, BuddyNpcSpawn anchors,
+PuppySpawn candidates, and BuddyPortal to BackpackCheckpoint.
 """
 
 from __future__ import annotations
@@ -24,41 +24,513 @@ from ..lua_emit import (
     find_or_create_path,
     make_billboard_gui,
     make_disc,
+    make_folder,
     make_model,
     make_part,
+    make_wedge,
     set_attribute,
     set_primary_part,
 )
 from ..style import PALETTE, Tags, Attributes
+from ._props import emit_cone_tree, emit_cottage
 
 
-# spawn anchors — six npc spawns, each tagged with the scene archetype.
-# coordinates are LOCAL to the level model (origin at PrimaryPart). the
-# play-area service will reposition the cloned level via PrimaryPart CFrame.
-_NPC_SPAWNS = [
-    # (npc_spawn_id, anchor_label, x, y, z, yaw_deg)
-    ("npc_spawn_hotdog", "HotdogStand", -30, 1, -10, 0),
-    ("npc_spawn_playground", "Playground", 28, 1, -18, 180),
-    ("npc_spawn_whitevan", "WhiteVan", 38, 1, 22, -90),
-    ("npc_spawn_alley", "AlleyBehindShop", -38, 1, 22, 90),
-    ("npc_spawn_ranger", "RangerBooth", 0, 1, -28, 0),
-    ("npc_spawn_bench", "BenchFountain", -8, 1, 8, 180),
+# road geometry constants — used everywhere so changing them rescales the
+# whole intersection cleanly.
+_ROAD_WIDTH = 24
+_ROAD_LENGTH = 100
+_SIDEWALK_W = 8
+_GROUND_HALF = 80
+
+
+# (npc_spawn_id, anchor_label, x, z, yaw_deg, patrol_offsets)
+# patrol_offsets is a list of (dx, dz) waypoint offsets relative to the
+# spawn point — gives the npc a small route to walk so the scene feels alive.
+_NPC_SPAWNS: list[tuple[str, str, float, float, float, list[tuple[float, float]]]] = [
+    # NE corner — hotdog shop, vendor patrols counter
+    ("npc_spawn_hotdog", "HotdogShop", 22, -22, 200, [(0, 0), (4, 0), (4, 4), (0, 4)]),
+    # NW corner — general store / ranger area, walking the storefront
+    ("npc_spawn_ranger", "GeneralStore", -22, -22, 160, [(0, 0), (-6, 0), (-6, 4), (0, 4)]),
+    # SE corner — white van + leaner, leans against the van bumper
+    ("npc_spawn_whitevan", "WhiteVan", 24, 24, -20, [(0, 0), (3, 2), (-2, 4)]),
+    # SW corner — alley cluster, hooded figure pacing the alley mouth
+    ("npc_spawn_alley", "AlleyMouth", -24, 26, 30, [(0, 0), (-3, -2), (-6, 1), (-3, 3)]),
+    # north sidewalk — casual park-goer / parent with stroller
+    ("npc_spawn_north_walk", "NorthSidewalk", -8, -36, 90, [(0, 0), (10, 0), (16, 0), (4, 0)]),
+    # south sidewalk — bench/fountain area, casual stroll
+    ("npc_spawn_south_walk", "SouthSidewalk", 6, 38, -90, [(0, 0), (-8, 0), (-14, 0), (-4, 0)]),
+    # east sidewalk
+    ("npc_spawn_east_walk", "EastSidewalk", 36, 8, 180, [(0, 0), (0, -10), (0, -16), (0, -4)]),
+    # west sidewalk
+    ("npc_spawn_west_walk", "WestSidewalk", -36, -6, 0, [(0, 0), (0, 10), (0, 16), (0, 4)]),
 ]
 
 _PUPPY_SPAWNS = [
-    # (puppy_spawn_id, x, y, z) — four candidates, server picks one
-    ("puppy_spawn_fountain", 0, 1, 12),
-    ("puppy_spawn_bench", -10, 1, 4),
-    ("puppy_spawn_playground_slide", 26, 1, -22),
-    ("puppy_spawn_alley_corner", -34, 1, 26),
+    ("puppy_spawn_intersection_center", 0, 0),
+    ("puppy_spawn_north_corner", -28, -32),
+    ("puppy_spawn_south_corner", 28, 30),
+    ("puppy_spawn_alley_corner", -32, 30),
 ]
+
+
+def _emit_road_strip(p: LuaProgram, *, name: str, var: str, axis: str, base_y: float) -> None:
+    """horizontal asphalt road plus its yellow center line and end caps.
+
+    axis="ns" runs along the z axis (north-south), axis="ew" along x.
+    """
+    if axis == "ns":
+        sx, sz = _ROAD_WIDTH, _ROAD_LENGTH * 2
+    else:
+        sx, sz = _ROAD_LENGTH * 2, _ROAD_WIDTH
+    p.line(
+        make_part(
+            var,
+            parent="streets",
+            name=name,
+            size=(sx, 0.4, sz),
+            cframe=cframe_pos(0, base_y + 0.2, 0),
+            color_rgb=PALETTE.asphalt,
+            material_name="Concrete",
+        )
+    )
+    # dashed yellow centerline — multiple short paint stripes
+    if axis == "ns":
+        for i, offset in enumerate(range(-90, 100, 12)):
+            p.line(
+                make_part(
+                    f"{var}_dash_{i}",
+                    parent="streets",
+                    name=f"CenterDash{i}",
+                    size=(0.6, 0.06, 6),
+                    cframe=cframe_pos(0, base_y + 0.45, offset),
+                    color_rgb=PALETTE.road_yellow,
+                    material_name="SmoothPlastic",
+                )
+            )
+    else:
+        for i, offset in enumerate(range(-90, 100, 12)):
+            p.line(
+                make_part(
+                    f"{var}_dash_{i}",
+                    parent="streets",
+                    name=f"CenterDash{i}",
+                    size=(6, 0.06, 0.6),
+                    cframe=cframe_pos(offset, base_y + 0.45, 0),
+                    color_rgb=PALETTE.road_yellow,
+                    material_name="SmoothPlastic",
+                )
+            )
+
+
+def _emit_crosswalks(p: LuaProgram, base_y: float) -> None:
+    """four sets of crosswalk stripes, one entering each side of the box."""
+    half = _ROAD_WIDTH / 2
+    stripe_w = 1.4
+    stripe_l = _ROAD_WIDTH - 4
+    # n side stripes (running east-west along z = -half - 1)
+    for i in range(6):
+        x = -half + 2 + i * 4
+        p.line(
+            make_part(
+                f"cw_n_{i}",
+                parent="streets",
+                name=f"CrosswalkN{i}",
+                size=(stripe_w, 0.06, stripe_l),
+                cframe=cframe_pos(x, base_y + 0.45, -half - 6),
+                color_rgb=PALETTE.crosswalk_paint,
+                material_name="SmoothPlastic",
+            )
+        )
+    for i in range(6):
+        x = -half + 2 + i * 4
+        p.line(
+            make_part(
+                f"cw_s_{i}",
+                parent="streets",
+                name=f"CrosswalkS{i}",
+                size=(stripe_w, 0.06, stripe_l),
+                cframe=cframe_pos(x, base_y + 0.45, half + 6),
+                color_rgb=PALETTE.crosswalk_paint,
+                material_name="SmoothPlastic",
+            )
+        )
+    for i in range(6):
+        z = -half + 2 + i * 4
+        p.line(
+            make_part(
+                f"cw_w_{i}",
+                parent="streets",
+                name=f"CrosswalkW{i}",
+                size=(stripe_l, 0.06, stripe_w),
+                cframe=cframe_pos(-half - 6, base_y + 0.45, z),
+                color_rgb=PALETTE.crosswalk_paint,
+                material_name="SmoothPlastic",
+            )
+        )
+    for i in range(6):
+        z = -half + 2 + i * 4
+        p.line(
+            make_part(
+                f"cw_e_{i}",
+                parent="streets",
+                name=f"CrosswalkE{i}",
+                size=(stripe_l, 0.06, stripe_w),
+                cframe=cframe_pos(half + 6, base_y + 0.45, z),
+                color_rgb=PALETTE.crosswalk_paint,
+                material_name="SmoothPlastic",
+            )
+        )
+
+
+def _emit_sidewalks(p: LuaProgram, base_y: float) -> None:
+    """four L-shaped sidewalk corners around the intersection.
+
+    corners are quadrants that fill from the road edge out to the ground edge.
+    they curl inward at the intersection so pedestrians have a corner to
+    stand on, plus curbs along the road edges.
+    """
+    half = _ROAD_WIDTH / 2
+    far = _GROUND_HALF
+    # quadrant slabs — each (cx, cz, sx, sz)
+    quadrants = [
+        ("NW", -(far + half) / 2, -(far + half) / 2, far - half, far - half),
+        ("NE", (far + half) / 2, -(far + half) / 2, far - half, far - half),
+        ("SW", -(far + half) / 2, (far + half) / 2, far - half, far - half),
+        ("SE", (far + half) / 2, (far + half) / 2, far - half, far - half),
+    ]
+    for name, cx, cz, sx, sz in quadrants:
+        p.line(
+            make_part(
+                f"sidewalk_{name}",
+                parent="streets",
+                name=f"Sidewalk{name}",
+                size=(sx, 0.6, sz),
+                cframe=cframe_pos(cx, base_y + 0.3, cz),
+                color_rgb=PALETTE.sidewalk,
+                material_name="Concrete",
+            )
+        )
+    # curbs running along the road edges — slightly raised dark strips
+    curb_thickness = 0.4
+    curb_h = 0.4
+    edge_len = far - half
+    for sign_x in (-1, 1):
+        for sign_z in (-1, 1):
+            # vertical curb between corner and intersection along z
+            cz = sign_z * (half + edge_len / 2)
+            cx = sign_x * (half - curb_thickness / 2)
+            p.line(
+                make_part(
+                    f"curb_v_{sign_x}_{sign_z}",
+                    parent="streets",
+                    name=f"CurbV_{sign_x}_{sign_z}",
+                    size=(curb_thickness, curb_h, edge_len),
+                    cframe=cframe_pos(cx, base_y + 0.7, cz),
+                    color_rgb=PALETTE.curb,
+                    material_name="Concrete",
+                )
+            )
+            # horizontal curb along x
+            cz2 = sign_z * (half - curb_thickness / 2)
+            cx2 = sign_x * (half + edge_len / 2)
+            p.line(
+                make_part(
+                    f"curb_h_{sign_x}_{sign_z}",
+                    parent="streets",
+                    name=f"CurbH_{sign_x}_{sign_z}",
+                    size=(edge_len, curb_h, curb_thickness),
+                    cframe=cframe_pos(cx2, base_y + 0.7, cz2),
+                    color_rgb=PALETTE.curb,
+                    material_name="Concrete",
+                )
+            )
+
+
+def _emit_corner_buildings(p: LuaProgram) -> None:
+    """four corner buildings — hotdog shop NE, general store NW, alley cluster SW, parked van SE."""
+    p.line(make_model("buildings", parent="level", name="CornerBuildings"))
+
+    # NE — hotdog shop cottage with red roof and big sign
+    emit_cottage(
+        p,
+        var_prefix="b_hotdog",
+        parent="buildings",
+        cx=30,
+        cz=-30,
+        base_y=0.6,
+        yaw_deg=200,
+        width=14,
+        depth=11,
+        wall_h=7,
+        wall_color=PALETTE.hot_dog_red,
+        roof_color=PALETTE.roof_red_dark,
+    )
+    p.line(
+        make_part(
+            "b_hotdog_signpost",
+            parent="buildings",
+            name="HotdogSignPost",
+            size=(0.8, 9, 0.8),
+            cframe=cframe_pos(20, 5, -22),
+            color_rgb=PALETTE.cottage_trim,
+            material_name="Wood",
+        )
+    )
+    p.line(
+        make_part(
+            "b_hotdog_sign",
+            parent="buildings",
+            name="HotdogSign",
+            size=(5, 2.5, 0.4),
+            cframe=cframe_pos(20, 9, -22),
+            color_rgb=PALETTE.sign_face,
+            material_name="WoodPlanks",
+        )
+    )
+    p.line(
+        make_billboard_gui(
+            "b_hotdog_sign_label",
+            adornee="b_hotdog_sign",
+            text="HOT DOGS",
+            studs_offset_y=2,
+            text_size=32,
+        )
+    )
+
+    # NW — general store / ranger station, ranger green walls
+    emit_cottage(
+        p,
+        var_prefix="b_store",
+        parent="buildings",
+        cx=-30,
+        cz=-30,
+        base_y=0.6,
+        yaw_deg=160,
+        width=14,
+        depth=11,
+        wall_h=7,
+        wall_color=PALETTE.ranger_green,
+        roof_color=PALETTE.roof_red,
+    )
+    p.line(
+        make_part(
+            "b_store_sign",
+            parent="buildings",
+            name="StoreSign",
+            size=(6, 2, 0.4),
+            cframe=cframe_pos(-22, 6, -22),
+            color_rgb=PALETTE.sign_face,
+            material_name="WoodPlanks",
+        )
+    )
+    p.line(
+        make_billboard_gui(
+            "b_store_sign_label",
+            adornee="b_store_sign",
+            text="GENERAL STORE",
+            studs_offset_y=2,
+            text_size=24,
+        )
+    )
+
+    # SW — alley cluster: two narrow buildings with a gap that forms the alley
+    p.line(make_model("alley_cluster", parent="buildings", name="AlleyCluster"))
+    p.line(
+        make_part(
+            "ac_left_wall",
+            parent="alley_cluster",
+            name="LeftBuilding",
+            size=(8, 10, 14),
+            cframe=cframe_pos(-34, 5.6, 26),
+            color_rgb=PALETTE.alley_brick,
+            material_name="Concrete",
+        )
+    )
+    p.line(
+        make_part(
+            "ac_right_wall",
+            parent="alley_cluster",
+            name="RightBuilding",
+            size=(8, 10, 14),
+            cframe=cframe_pos(-22, 5.6, 26),
+            color_rgb=PALETTE.cottage_wall,
+            material_name="WoodPlanks",
+        )
+    )
+    p.line(
+        make_part(
+            "ac_alley_floor",
+            parent="alley_cluster",
+            name="AlleyFloor",
+            size=(4, 0.4, 12),
+            cframe=cframe_pos(-28, 0.8, 26),
+            color_rgb=PALETTE.asphalt_dark,
+            material_name="Concrete",
+        )
+    )
+    p.line(
+        make_part(
+            "ac_dumpster",
+            parent="alley_cluster",
+            name="Dumpster",
+            size=(2.5, 2, 3),
+            cframe=cframe_pos(-28, 1.7, 30),
+            color_rgb=PALETTE.bin_pack_it,
+            material_name="SmoothPlastic",
+        )
+    )
+    p.line(
+        make_part(
+            "ac_lamp_post",
+            parent="alley_cluster",
+            name="StreetLampPost",
+            size=(0.6, 8, 0.6),
+            cframe=cframe_pos(-28, 4.6, 22),
+            color_rgb=PALETTE.cottage_trim,
+            material_name="SmoothPlastic",
+        )
+    )
+    p.line(
+        make_part(
+            "ac_lamp_bulb",
+            parent="alley_cluster",
+            name="StreetLampBulb",
+            size=(1, 1, 1),
+            cframe=cframe_pos(-28, 8.4, 22),
+            color_rgb=PALETTE.sparkle,
+            material_name="SmoothPlastic",
+            shape="Ball",
+        )
+    )
+
+    # SE — parked white van and a small storefront behind it
+    p.line(make_model("vanblock", parent="buildings", name="VanBlock"))
+    emit_cottage(
+        p,
+        var_prefix="b_van_shop",
+        parent="vanblock",
+        cx=32,
+        cz=32,
+        base_y=0.6,
+        yaw_deg=-20,
+        width=14,
+        depth=11,
+        wall_h=7,
+        wall_color=PALETTE.bench_wood,
+        roof_color=PALETTE.roof_red,
+    )
+    # parked van
+    p.line(make_model("whitevan", parent="vanblock", name="WhiteVan"))
+    p.line(
+        make_part(
+            "wv_body",
+            parent="whitevan",
+            name="VanBody",
+            size=(8, 5, 4),
+            cframe=cframe_pos(20, 3, 24),
+            color_rgb=PALETTE.white_van_body,
+            material_name="SmoothPlastic",
+        )
+    )
+    p.line(
+        make_part(
+            "wv_top",
+            parent="whitevan",
+            name="VanTop",
+            size=(8, 2, 4),
+            cframe=cframe_pos(20, 6.5, 24),
+            color_rgb=PALETTE.white_van_body,
+            material_name="SmoothPlastic",
+        )
+    )
+    for i, wx in enumerate([17, 23]):
+        for j, wz in enumerate([22, 26]):
+            p.line(
+                make_part(
+                    f"wv_wheel_{i}_{j}",
+                    parent="whitevan",
+                    name="Wheel",
+                    size=(1.6, 1.6, 1.6),
+                    cframe=cframe_pos_yaw(wx, 1.1, wz, 90),
+                    color_rgb=PALETTE.cottage_trim,
+                    material_name="SmoothPlastic",
+                    shape="Cylinder",
+                )
+            )
+    p.line(
+        make_part(
+            "wv_door",
+            parent="whitevan",
+            name="OpenSideDoor",
+            size=(0.4, 4, 4),
+            cframe=cframe_pos_yaw(16, 3, 24, 60),
+            color_rgb=PALETTE.white_van_body,
+            material_name="SmoothPlastic",
+        )
+    )
+    p.line(
+        make_part(
+            "wv_windshield",
+            parent="whitevan",
+            name="Windshield",
+            size=(0.3, 2.4, 3.6),
+            cframe=cframe_pos(24, 5.5, 24),
+            color_rgb=PALETTE.fountain_water,
+            material_name="SmoothPlastic",
+            transparency=0.3,
+        )
+    )
+
+
+def _emit_npc_spawns_and_patrols(p: LuaProgram) -> None:
+    """anchor each npc spawn AND a PatrolPath folder of waypoints next to it."""
+    p.line(make_folder("patrol_root", parent="level", name="PatrolPaths"))
+    for spawn_id, anchor, x, z, yaw, offsets in _NPC_SPAWNS:
+        var = f"spawn_{spawn_id}"
+        p.line(
+            make_disc(
+                var,
+                parent="level",
+                name=spawn_id,
+                diameter=3,
+                height=0.6,
+                cframe=cframe_pos_yaw(x, 0.6, z, yaw),
+                color_rgb=PALETTE.sparkle,
+                material_name="SmoothPlastic",
+                transparency=0.6,
+                can_collide=False,
+            )
+        )
+        p.line(add_tag(var, Tags.BUDDY_NPC_SPAWN))
+        p.line(set_attribute(var, Attributes.NPC_SPAWN_ID, spawn_id))
+        p.line(set_attribute(var, Attributes.ANCHOR, anchor))
+        # patrol path folder: a list of small invisible waypoint parts
+        path_var = f"patrol_{spawn_id}"
+        p.line(make_folder(path_var, parent="patrol_root", name=spawn_id))
+        for idx, (dx, dz) in enumerate(offsets):
+            wp_var = f"{path_var}_wp_{idx}"
+            p.line(
+                make_part(
+                    wp_var,
+                    parent=path_var,
+                    name=f"Waypoint{idx}",
+                    size=(1, 0.2, 1),
+                    cframe=cframe_pos(x + dx, 1.1, z + dz),
+                    color_rgb=PALETTE.sparkle,
+                    transparency=1,
+                    can_collide=False,
+                )
+            )
+            p.line(add_tag(wp_var, Tags.NPC_PATROL_NODE))
+            p.line(set_attribute(wp_var, "WaypointIndex", idx))
+        p.line(set_attribute(var, "PatrolPath", spawn_id))
+        p.created(f"NpcSpawn/{spawn_id}")
 
 
 def emit_stranger_danger_park_lua() -> str:
     p = LuaProgram()
-    p.comment("buddy bridge stranger danger park level template — generated")
+    p.comment("buddy bridge stranger danger — 4-way intersection level")
 
-    # ensure ServerStorage/Levels exists, then nuke any old level model
     p.line(find_or_create_path("ServerStorage", "Levels"))
     p.line("local levels_root = _path")
     p.line(clear_existing("levels_root", "StrangerDangerPark"))
@@ -81,32 +553,28 @@ def emit_stranger_danger_park_lua() -> str:
     )
     p.line(set_primary_part("level", "level_origin"))
 
-    # ground — generous park footprint
+    # ground plane — sandy lot extending past the sidewalks so empty corners
+    # read as "outskirts" not "void"
     p.line(
         make_part(
-            "park_ground",
+            "ground",
             parent="level",
-            name="ParkGround",
-            size=(120, 2, 120),
+            name="GroundPlane",
+            size=(_GROUND_HALF * 2 + 20, 2, _GROUND_HALF * 2 + 20),
             cframe=cframe_pos(0, -1, 0),
-            color_rgb=PALETTE.grass,
-            material_name="Grass",
-        )
-    )
-    # winding path through the middle
-    p.line(
-        make_part(
-            "park_path",
-            parent="level",
-            name="ParkPath",
-            size=(8, 0.3, 80),
-            cframe=cframe_pos(0, 0.15, 0),
-            color_rgb=PALETTE.path,
+            color_rgb=PALETTE.sand_warm,
             material_name="Sand",
         )
     )
 
-    # level entry — explorer spawns at the south end of the park
+    # streets folder bundles asphalt + paint + sidewalks
+    p.line(make_model("streets", parent="level", name="Streets"))
+    _emit_road_strip(p, name="RoadNS", var="road_ns", axis="ns", base_y=0)
+    _emit_road_strip(p, name="RoadEW", var="road_ew", axis="ew", base_y=0)
+    _emit_sidewalks(p, base_y=0)
+    _emit_crosswalks(p, base_y=0)
+
+    # level entry — explorer arrives at the south sidewalk
     p.line(
         make_disc(
             "level_entry",
@@ -114,7 +582,7 @@ def emit_stranger_danger_park_lua() -> str:
             name="LevelEntry",
             diameter=4,
             height=1,
-            cframe=cframe_pos(0, 0.5, -50),
+            cframe=cframe_pos(0, 0.9, 50),
             color_rgb=PALETTE.sparkle,
             transparency=0.4,
             can_collide=False,
@@ -122,541 +590,39 @@ def emit_stranger_danger_park_lua() -> str:
     )
     p.line(add_tag("level_entry", Tags.LEVEL_ENTRY))
 
-    # ----- scene: hot dog stand (safe archetype anchor)
-    p.line(make_model("hotdog", parent="level", name="HotdogStand"))
-    p.line(
-        make_part(
-            "hd_counter",
-            parent="hotdog",
-            name="Counter",
-            size=(10, 4, 4),
-            cframe=cframe_pos(-30, 2, -10),
-            color_rgb=PALETTE.hot_dog_red,
-            material_name="SmoothPlastic",
-        )
-    )
-    p.line(
-        make_part(
-            "hd_roof",
-            parent="hotdog",
-            name="Roof",
-            size=(12, 0.5, 5),
-            cframe=cframe_pos(-30, 6, -10),
-            color_rgb=PALETTE.sign_face,
-            material_name="SmoothPlastic",
-        )
-    )
-    p.line(
-        make_billboard_gui(
-            "hd_sign",
-            adornee="hd_roof",
-            text="HOT DOGS",
-            studs_offset_y=2,
-            text_size=32,
-        )
-    )
-    # roof support poles flanking the counter
-    for side, dx in (("L", -5.5), ("R", 5.5)):
-        p.line(
-            make_part(
-                f"hd_post_{side}",
-                parent="hotdog",
-                name=f"RoofPost{side}",
-                size=(0.4, 5.6, 0.4),
-                cframe=cframe_pos(-30 + dx, 2.8, -10),
-                color_rgb=PALETTE.wood_dark,
-                material_name="Wood",
-            )
-        )
-    # cartoon hot dog on the counter — bun + sausage
-    p.line(
-        make_part(
-            "hd_bun",
-            parent="hotdog",
-            name="DisplayBun",
-            size=(2.4, 0.6, 0.8),
-            cframe=cframe_pos(-30, 4.4, -8.2),
-            color_rgb=PALETTE.bun,
-            material_name="SmoothPlastic",
-        )
-    )
-    p.line(
-        make_part(
-            "hd_sausage",
-            parent="hotdog",
-            name="DisplaySausage",
-            size=(2.6, 0.4, 0.5),
-            cframe=cframe_pos(-30, 4.8, -8.2),
-            color_rgb=PALETTE.sausage,
-            material_name="SmoothPlastic",
-        )
-    )
-    # menu board on the counter face
-    p.line(
-        make_part(
-            "hd_menu",
-            parent="hotdog",
-            name="MenuBoard",
-            size=(3.4, 2, 0.2),
-            cframe=cframe_pos(-32, 3, -8.05),
-            color_rgb=PALETTE.sign_face,
-            material_name="SmoothPlastic",
-        )
-    )
-    p.line(
-        make_billboard_gui(
-            "hd_menu_label",
-            adornee="hd_menu",
-            text="$2 — open!",
-            studs_offset_y=0,
-            text_size=22,
-        )
-    )
+    # corner buildings — hotdog, general store, alley, van block
+    _emit_corner_buildings(p)
 
-    # ----- scene: playground
-    p.line(make_model("playground", parent="level", name="Playground"))
-    p.line(
-        make_part(
-            "pg_floor",
-            parent="playground",
-            name="Padding",
-            size=(20, 0.5, 16),
-            cframe=cframe_pos(28, 0.25, -18),
-            color_rgb=PALETTE.playground_blue,
-            material_name="SmoothPlastic",
-        )
-    )
-    # cartoon slide
-    p.line(
-        make_part(
-            "pg_slide_top",
-            parent="playground",
-            name="SlideTop",
-            size=(3, 1, 4),
-            cframe=cframe_pos(26, 5, -22),
-            color_rgb=PALETTE.capsule_a,
-            material_name="SmoothPlastic",
-        )
-    )
-    p.line(
-        make_part(
-            "pg_slide_ramp",
-            parent="playground",
-            name="SlideRamp",
-            size=(3, 0.5, 8),
-            cframe=cframe_pos_yaw(26, 3, -19, 25),
-            color_rgb=PALETTE.capsule_a,
-            material_name="SmoothPlastic",
-        )
-    )
-    # swing frame
-    p.line(
-        make_part(
-            "pg_swing_l",
-            parent="playground",
-            name="SwingPostL",
-            size=(0.6, 6, 0.6),
-            cframe=cframe_pos(32, 3, -16),
-            color_rgb=PALETTE.wood_dark,
-            material_name="Wood",
-        )
-    )
-    p.line(
-        make_part(
-            "pg_swing_r",
-            parent="playground",
-            name="SwingPostR",
-            size=(0.6, 6, 0.6),
-            cframe=cframe_pos(32, 3, -20),
-            color_rgb=PALETTE.wood_dark,
-            material_name="Wood",
-        )
-    )
-    p.line(
-        make_part(
-            "pg_swing_top",
-            parent="playground",
-            name="SwingTop",
-            size=(0.6, 0.6, 5),
-            cframe=cframe_pos(32, 6, -18),
-            color_rgb=PALETTE.wood_dark,
-            material_name="Wood",
-        )
-    )
-    # actual swings hanging from the frame
-    for i, sz in enumerate((-16.5, -19.5)):
-        p.line(
-            make_part(
-                f"pg_swing_chain_{i}",
-                parent="playground",
-                name=f"SwingChain{i}",
-                size=(0.15, 3.4, 0.15),
-                cframe=cframe_pos(32, 4.1, sz),
-                color_rgb=PALETTE.wood_dark,
-                material_name="SmoothPlastic",
-            )
-        )
-        p.line(
-            make_part(
-                f"pg_swing_seat_{i}",
-                parent="playground",
-                name=f"SwingSeat{i}",
-                size=(1.6, 0.3, 0.6),
-                cframe=cframe_pos(32, 2.4, sz),
-                color_rgb=PALETTE.bin_pack_it,
-                material_name="SmoothPlastic",
-            )
+    # decorative cone-stack trees scattered along the perimeter sand
+    tree_positions = [
+        (-70, -70, 1.0), (-50, -70, 0.9), (50, -70, 0.95), (70, -70, 1.0),
+        (-70, 70, 1.0), (-50, 70, 0.9), (50, 70, 0.95), (70, 70, 1.0),
+        (-70, -25, 1.0), (-70, 25, 0.95),
+        (70, -25, 1.0), (70, 25, 0.95),
+        (-15, -70, 0.85), (15, -70, 0.85),
+        (-15, 70, 0.85), (15, 70, 0.85),
+    ]
+    p.line(make_model("trees", parent="level", name="Trees"))
+    for i, (tx, tz, scale) in enumerate(tree_positions):
+        emit_cone_tree(
+            p,
+            var_prefix=f"tree_{i}",
+            parent="trees",
+            cx=tx,
+            cz=tz,
+            base_y=0,
+            scale=scale,
         )
 
-    # ----- scene: white van (risky)
-    p.line(make_model("whitevan", parent="level", name="WhiteVan"))
-    p.line(
-        make_part(
-            "wv_body",
-            parent="whitevan",
-            name="VanBody",
-            size=(8, 5, 4),
-            cframe=cframe_pos(38, 2.5, 22),
-            color_rgb=PALETTE.white_van_body,
-            material_name="SmoothPlastic",
-        )
-    )
-    p.line(
-        make_part(
-            "wv_top",
-            parent="whitevan",
-            name="VanTop",
-            size=(8, 2, 4),
-            cframe=cframe_pos(38, 6, 22),
-            color_rgb=PALETTE.white_van_body,
-            material_name="SmoothPlastic",
-        )
-    )
-    # wheels
-    for i, wx in enumerate([35, 41]):
-        for j, wz in enumerate([20, 24]):
-            p.line(
-                make_part(
-                    f"wv_wheel_{i}_{j}",
-                    parent="whitevan",
-                    name="Wheel",
-                    size=(1.6, 1.6, 1.6),
-                    cframe=cframe_pos_yaw(wx, 0.8, wz, 90),
-                    color_rgb=PALETTE.wood_dark,
-                    material_name="SmoothPlastic",
-                    shape="Cylinder",
-                )
-            )
-    # open side door — cue the "calling you over" pose
-    p.line(
-        make_part(
-            "wv_door",
-            parent="whitevan",
-            name="OpenSideDoor",
-            size=(0.4, 4, 4),
-            cframe=cframe_pos_yaw(34, 2.5, 22, 60),
-            color_rgb=PALETTE.white_van_body,
-            material_name="SmoothPlastic",
-        )
-    )
-    # windshield (front of the van)
-    p.line(
-        make_part(
-            "wv_windshield",
-            parent="whitevan",
-            name="Windshield",
-            size=(0.3, 2.4, 3.6),
-            cframe=cframe_pos(42, 5, 22),
-            color_rgb=PALETTE.fountain_water,
-            material_name="SmoothPlastic",
-            transparency=0.3,
-        )
-    )
-    # brake lights — small red squares at the rear
-    for i, wz in enumerate((20.5, 23.5)):
-        p.line(
-            make_part(
-                f"wv_brake_{i}",
-                parent="whitevan",
-                name=f"BrakeLight{i}",
-                size=(0.2, 0.6, 0.6),
-                cframe=cframe_pos(34.1, 1.6, wz),
-                color_rgb=PALETTE.bin_leave_it,
-                material_name="SmoothPlastic",
-            )
-        )
-    # license plate
-    p.line(
-        make_part(
-            "wv_plate",
-            parent="whitevan",
-            name="LicensePlate",
-            size=(0.2, 0.7, 1.6),
-            cframe=cframe_pos(34.05, 1.2, 22),
-            color_rgb=PALETTE.sign_face,
-            material_name="SmoothPlastic",
-        )
-    )
-
-    # ----- scene: alley behind shop
-    p.line(make_model("alley", parent="level", name="Alley"))
-    # back wall of the "shop"
-    p.line(
-        make_part(
-            "al_shopwall",
-            parent="alley",
-            name="ShopBackWall",
-            size=(20, 10, 1),
-            cframe=cframe_pos(-32, 5, 24),
-            color_rgb=PALETTE.alley_brick,
-            material_name="SmoothPlastic",
-        )
-    )
-    # narrow passage marker
-    p.line(
-        make_part(
-            "al_floor",
-            parent="alley",
-            name="AlleyFloor",
-            size=(8, 0.4, 12),
-            cframe=cframe_pos(-38, 0.2, 22),
-            color_rgb=PALETTE.alley_brick,
-            material_name="Concrete",
-        )
-    )
-    p.line(
-        make_part(
-            "al_dumpster",
-            parent="alley",
-            name="Dumpster",
-            size=(2.5, 2, 3),
-            cframe=cframe_pos(-39, 1, 26),
-            color_rgb=PALETTE.bin_pack_it,
-            material_name="SmoothPlastic",
-        )
-    )
-    # service door at the back of the shop — exit cue for an alley scene
-    p.line(
-        make_part(
-            "al_door_frame",
-            parent="alley",
-            name="DoorFrame",
-            size=(0.3, 4.4, 2.4),
-            cframe=cframe_pos(-31.7, 2.2, 18),
-            color_rgb=PALETTE.wood_dark,
-            material_name="Wood",
-        )
-    )
-    p.line(
-        make_part(
-            "al_door",
-            parent="alley",
-            name="ServiceDoor",
-            size=(0.2, 3.8, 1.8),
-            cframe=cframe_pos(-31.6, 2, 18),
-            color_rgb=PALETTE.wood_warm,
-            material_name="Wood",
-        )
-    )
-    # streetlamp — long stem with a glowing top, anchors "lurking spot lit
-    # from above". the light part is sparkle-yellow but kept as
-    # SmoothPlastic because Neon is forbidden by the visual style bible.
-    p.line(
-        make_part(
-            "al_lamp_post",
-            parent="alley",
-            name="StreetLampPost",
-            size=(0.6, 7, 0.6),
-            cframe=cframe_pos(-36, 3.5, 22),
-            color_rgb=PALETTE.wood_dark,
-            material_name="SmoothPlastic",
-        )
-    )
-    p.line(
-        make_part(
-            "al_lamp_arm",
-            parent="alley",
-            name="StreetLampArm",
-            size=(2, 0.4, 0.4),
-            cframe=cframe_pos(-37, 7, 22),
-            color_rgb=PALETTE.wood_dark,
-            material_name="SmoothPlastic",
-        )
-    )
-    p.line(
-        make_part(
-            "al_lamp_bulb",
-            parent="alley",
-            name="StreetLampBulb",
-            size=(1, 1, 1),
-            cframe=cframe_pos(-38, 6.7, 22),
-            color_rgb=PALETTE.sparkle,
-            material_name="SmoothPlastic",
-            shape="Ball",
-        )
-    )
-    # cardboard boxes — stacked alley clutter, gives the scene texture
-    p.line(
-        make_part(
-            "al_box_a",
-            parent="alley",
-            name="CardboardBoxA",
-            size=(2, 1.6, 1.6),
-            cframe=cframe_pos(-37.5, 0.8, 19),
-            color_rgb=PALETTE.wood_warm,
-            material_name="SmoothPlastic",
-        )
-    )
-    p.line(
-        make_part(
-            "al_box_b",
-            parent="alley",
-            name="CardboardBoxB",
-            size=(1.4, 1.2, 1.2),
-            cframe=cframe_pos(-36.5, 2.2, 19),
-            color_rgb=PALETTE.wood_warm,
-            material_name="SmoothPlastic",
-        )
-    )
-
-    # ----- scene: ranger booth
-    p.line(make_model("ranger", parent="level", name="RangerBooth"))
-    p.line(
-        make_part(
-            "rb_walls",
-            parent="ranger",
-            name="BoothWalls",
-            size=(8, 6, 6),
-            cframe=cframe_pos(0, 3, -28),
-            color_rgb=PALETTE.ranger_green,
-            material_name="WoodPlanks",
-        )
-    )
-    p.line(
-        make_part(
-            "rb_roof",
-            parent="ranger",
-            name="BoothRoof",
-            size=(10, 0.6, 8),
-            cframe=cframe_pos(0, 6.4, -28),
-            color_rgb=PALETTE.wood_dark,
-            material_name="WoodPlanks",
-        )
-    )
-    p.line(
-        make_billboard_gui(
-            "rb_sign",
-            adornee="rb_roof",
-            text="PARK RANGER",
-            studs_offset_y=2,
-            text_size=28,
-        )
-    )
-
-    # ----- scene: fountain + bench
-    p.line(make_model("fountain", parent="level", name="Fountain"))
-    p.line(
-        make_disc(
-            "ft_base",
-            parent="fountain",
-            name="Base",
-            diameter=8,
-            height=1,
-            cframe=cframe_pos(0, 0.5, 12),
-            color_rgb=PALETTE.fountain_stone,
-            material_name="Concrete",
-        )
-    )
-    p.line(
-        make_disc(
-            "ft_water",
-            parent="fountain",
-            name="Water",
-            diameter=6,
-            height=0.6,
-            cframe=cframe_pos(0, 1.3, 12),
-            color_rgb=PALETTE.fountain_water,
-            material_name="SmoothPlastic",
-            transparency=0.2,
-        )
-    )
-    p.line(
-        make_part(
-            "ft_pillar",
-            parent="fountain",
-            name="Pillar",
-            size=(1, 2.5, 1),
-            cframe=cframe_pos(0, 2, 12),
-            color_rgb=PALETTE.fountain_stone,
-            material_name="Concrete",
-        )
-    )
-    # tiered top bowl (saucer) for a more "centerpiece" fountain
-    p.line(
-        make_disc(
-            "ft_top_bowl",
-            parent="fountain",
-            name="TopBowl",
-            diameter=3,
-            height=0.6,
-            cframe=cframe_pos(0, 3.4, 12),
-            color_rgb=PALETTE.fountain_stone,
-            material_name="Concrete",
-        )
-    )
-    p.line(
-        make_disc(
-            "ft_top_water",
-            parent="fountain",
-            name="TopWater",
-            diameter=2.4,
-            height=0.3,
-            cframe=cframe_pos(0, 3.8, 12),
-            color_rgb=PALETTE.fountain_water,
-            material_name="SmoothPlastic",
-            transparency=0.25,
-        )
-    )
-    # cartoon water spout — small upward jet
-    p.line(
-        make_part(
-            "ft_spout",
-            parent="fountain",
-            name="WaterSpout",
-            size=(0.6, 1.2, 0.6),
-            cframe=cframe_pos(0, 4.4, 12),
-            color_rgb=PALETTE.fountain_water,
-            material_name="SmoothPlastic",
-            transparency=0.3,
-        )
-    )
-    # decorative pebbles along the rim
-    for i, ang in enumerate(range(0, 360, 60)):
-        import math
-
-        ang_rad = math.radians(ang)
-        px = math.cos(ang_rad) * 4.2
-        pz = 12 + math.sin(ang_rad) * 4.2
-        p.line(
-            make_part(
-                f"ft_pebble_{i}",
-                parent="fountain",
-                name=f"Pebble{i}",
-                size=(0.6, 0.4, 0.6),
-                cframe=cframe_pos(px, 1.2, pz),
-                color_rgb=PALETTE.fountain_stone,
-                material_name="SmoothPlastic",
-                shape="Ball",
-            )
-        )
-    # public bench
+    # public bench on the SW sidewalk so a "neutral parkgoer" archetype has
+    # somewhere to sit
     p.line(
         make_part(
             "bench_seat",
             parent="level",
             name="ParkBench",
             size=(7, 0.4, 1.5),
-            cframe=cframe_pos(-8, 1.5, 8),
+            cframe=cframe_pos(-30, 1.5, 14),
             color_rgb=PALETTE.bench_wood,
             material_name="Wood",
         )
@@ -667,64 +633,17 @@ def emit_stranger_danger_park_lua() -> str:
             parent="level",
             name="BenchBack",
             size=(7, 2, 0.4),
-            cframe=cframe_pos(-8, 2.5, 8.6),
+            cframe=cframe_pos(-30, 2.5, 14.6),
             color_rgb=PALETTE.bench_wood,
             material_name="Wood",
         )
     )
 
-    # ----- decorative cartoon trees, ringed around the park edges
-    for i, (tx, tz) in enumerate(
-        [(-50, -40), (50, -40), (-50, 40), (50, 40), (-25, -45), (25, -45)]
-    ):
-        p.line(
-            make_part(
-                f"tree_trunk_{i}",
-                parent="level",
-                name=f"TreeTrunk{i}",
-                size=(2, 8, 2),
-                cframe=cframe_pos(tx, 4, tz),
-                color_rgb=PALETTE.wood_warm,
-                material_name="Wood",
-            )
-        )
-        p.line(
-            make_part(
-                f"tree_canopy_{i}",
-                parent="level",
-                name=f"TreeCanopy{i}",
-                size=(8, 8, 8),
-                cframe=cframe_pos(tx, 11, tz),
-                color_rgb=PALETTE.treehouse_leaf,
-                material_name="Grass",
-                shape="Ball",
-            )
-        )
+    # npc patrol spawns
+    _emit_npc_spawns_and_patrols(p)
 
-    # ----- npc spawn points (six total)
-    for spawn_id, anchor, x, y, z, yaw in _NPC_SPAWNS:
-        var = f"spawn_{spawn_id}"
-        p.line(
-            make_disc(
-                var,
-                parent="level",
-                name=spawn_id,
-                diameter=3,
-                height=0.6,
-                cframe=cframe_pos_yaw(x, y - 0.2, z, yaw),
-                color_rgb=PALETTE.sparkle,
-                material_name="SmoothPlastic",
-                transparency=0.6,
-                can_collide=False,
-            )
-        )
-        p.line(add_tag(var, Tags.BUDDY_NPC_SPAWN))
-        p.line(set_attribute(var, Attributes.NPC_SPAWN_ID, spawn_id))
-        p.line(set_attribute(var, Attributes.ANCHOR, anchor))
-        p.created(f"NpcSpawn/{spawn_id}")
-
-    # ----- puppy spawn candidates (server picks one per round)
-    for spawn_id, x, y, z in _PUPPY_SPAWNS:
+    # puppy spawn candidates (server picks one per round)
+    for spawn_id, x, z in _PUPPY_SPAWNS:
         var = f"puppy_{spawn_id}"
         p.line(
             make_disc(
@@ -733,7 +652,7 @@ def emit_stranger_danger_park_lua() -> str:
                 name=spawn_id,
                 diameter=2,
                 height=0.6,
-                cframe=cframe_pos(x, y - 0.2, z),
+                cframe=cframe_pos(x, 0.9, z),
                 color_rgb=PALETTE.capsule_a,
                 material_name="SmoothPlastic",
                 transparency=0.7,
@@ -743,14 +662,14 @@ def emit_stranger_danger_park_lua() -> str:
         p.line(add_tag(var, Tags.PUPPY_SPAWN))
         p.created(f"PuppySpawn/{spawn_id}")
 
-    # ----- level exit (server activates near the chosen puppy spawn)
+    # level exit zone (server activates near the chosen puppy spawn)
     p.line(
         make_part(
             "level_exit",
             parent="level",
             name="LevelExit",
             size=(6, 4, 6),
-            cframe=cframe_pos(0, 2, 12),
+            cframe=cframe_pos(0, 2, 0),
             color_rgb=PALETTE.sparkle,
             transparency=0.85,
             can_collide=False,
@@ -758,7 +677,8 @@ def emit_stranger_danger_park_lua() -> str:
     )
     p.line(add_tag("level_exit", Tags.LEVEL_EXIT))
 
-    # ----- buddy portal to the next level (initially low-vis)
+    # buddy portal to the next level — placed off the east sidewalk past the
+    # corner so the duo can see it from the intersection center
     p.line(make_model("portal", parent="level", name="BuddyPortal"))
     p.line(
         make_part(
@@ -766,7 +686,7 @@ def emit_stranger_danger_park_lua() -> str:
             parent="portal",
             name="ArchTop",
             size=(8, 1, 1),
-            cframe=cframe_pos(50, 9, 0),
+            cframe=cframe_pos(60, 9, 0),
             color_rgb=PALETTE.capsule_b,
             material_name="SmoothPlastic",
         )
@@ -777,7 +697,7 @@ def emit_stranger_danger_park_lua() -> str:
             parent="portal",
             name="PostL",
             size=(1, 8, 1),
-            cframe=cframe_pos(46, 4, 0),
+            cframe=cframe_pos(56, 4, 0),
             color_rgb=PALETTE.capsule_b,
             material_name="SmoothPlastic",
         )
@@ -788,7 +708,7 @@ def emit_stranger_danger_park_lua() -> str:
             parent="portal",
             name="PostR",
             size=(1, 8, 1),
-            cframe=cframe_pos(54, 4, 0),
+            cframe=cframe_pos(64, 4, 0),
             color_rgb=PALETTE.capsule_b,
             material_name="SmoothPlastic",
         )
@@ -799,7 +719,7 @@ def emit_stranger_danger_park_lua() -> str:
             parent="portal",
             name="Field",
             size=(7, 7, 0.4),
-            cframe=cframe_pos(50, 4.5, 0),
+            cframe=cframe_pos(60, 4.5, 0),
             color_rgb=PALETTE.capsule_c,
             material_name="SmoothPlastic",
             transparency=0.5,
@@ -807,11 +727,19 @@ def emit_stranger_danger_park_lua() -> str:
         )
     )
     p.line(add_tag("portal", Tags.BUDDY_PORTAL))
-    p.line(make_billboard_gui("portal_label", adornee="portal_arch", text="To Backpack Checkpoint", text_size=22))
+    p.line(
+        make_billboard_gui(
+            "portal_label",
+            adornee="portal_arch",
+            text="To Backpack Checkpoint",
+            text_size=22,
+        )
+    )
 
-    p.note("StrangerDangerPark template built")
+    p.note("StrangerDangerPark intersection level built")
     p.created("Levels/StrangerDangerPark")
     return p.render()
 
 
 __all__ = ["emit_stranger_danger_park_lua"]
+_ = make_wedge  # imported for parity with sibling tools
