@@ -255,6 +255,87 @@ def emit_backpack_checkpoint_lua() -> str:
     )
     p.line(add_tag("finish", Tags.ROUND_FINISH_ZONE))
 
+    # entrance arch + sign — gives the level a clear "you've arrived" cue
+    p.line(make_model("entrance", parent="level", name="Entrance"))
+    p.line(
+        make_part(
+            "ent_post_l",
+            parent="entrance",
+            name="ArchPostL",
+            size=(0.8, 9, 0.8),
+            cframe=cframe_pos(-12, 4.5, -10),
+            color_rgb=PALETTE.bin_pack_it,
+            material_name="SmoothPlastic",
+        )
+    )
+    p.line(
+        make_part(
+            "ent_post_r",
+            parent="entrance",
+            name="ArchPostR",
+            size=(0.8, 9, 0.8),
+            cframe=cframe_pos(12, 4.5, -10),
+            color_rgb=PALETTE.bin_leave_it,
+            material_name="SmoothPlastic",
+        )
+    )
+    p.line(
+        make_part(
+            "ent_top",
+            parent="entrance",
+            name="ArchTop",
+            size=(25, 1.4, 1),
+            cframe=cframe_pos(0, 9.5, -10),
+            color_rgb=PALETTE.sign_face,
+            material_name="SmoothPlastic",
+        )
+    )
+    p.line(
+        make_billboard_gui(
+            "ent_label",
+            adornee="ent_top",
+            text="BACKPACK CHECKPOINT",
+            studs_offset_y=2,
+            text_size=44,
+        )
+    )
+
+    # side rails for the conveyor — gives the belt visual containment
+    for side, sx in (("L", -19), ("R", 19)):
+        p.line(
+            make_part(
+                f"belt_endcap_{side}",
+                parent="belt",
+                name=f"BeltEndcap{side}",
+                size=(1, 1.2, 4),
+                cframe=cframe_pos(sx, 1.4, 4),
+                color_rgb=PALETTE.wood_warm,
+                material_name="Wood",
+            )
+        )
+
+    # floor footprint markers under each bin so the explorer can see where
+    # to stand when triggering the proximity prompt
+    footprint_offsets = ((-8, "PackIt"), (0, "AskFirst"), (8, "LeaveIt"))
+    footprint_color = {
+        "PackIt": PALETTE.bin_pack_it,
+        "AskFirst": PALETTE.bin_ask_first,
+        "LeaveIt": PALETTE.bin_leave_it,
+    }
+    for fx, lane in footprint_offsets:
+        p.line(
+            make_part(
+                f"footprint_{lane}",
+                parent="level",
+                name=f"Footprint_{lane}",
+                size=(3, 0.05, 1.6),
+                cframe=cframe_pos(fx, 0.66, 2),
+                color_rgb=footprint_color[lane],
+                material_name="SmoothPlastic",
+                transparency=0.4,
+            )
+        )
+
     p.note("BackpackCheckpoint template built")
     p.created("Levels/BackpackCheckpoint")
     return p.render()
