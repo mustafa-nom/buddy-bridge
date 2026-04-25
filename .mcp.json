@@ -1,9 +1,14 @@
 {
   "mcpServers": {
+    "robloxstudio": {
+      "command": "npx",
+      "args": ["-y", "robloxstudio-mcp@latest"],
+      "description": "boshyxd robloxstudio-mcp — 43 tools (inspection + mutation), pairs with the robloxstudio-mcp studio plugin from https://github.com/boshyxd/robloxstudio-mcp/releases"
+    },
     "roblox-studio": {
       "command": "/home/matheus/.local/bin/rbx-studio-mcp",
       "args": ["--stdio"],
-      "description": "official roblox studio mcp — stdio transport, paired with the rbx-studio-mcp studio plugin"
+      "description": "official roblox studio mcp — stdio transport, paired with its own studio plugin. kept alongside robloxstudio because buddy-map-generator currently shells out to it for run_code"
     },
     "buddy-map-generator": {
       "command": "python3",
