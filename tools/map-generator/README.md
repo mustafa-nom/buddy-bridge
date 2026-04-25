@@ -1,11 +1,12 @@
 # buddy-map-generator
 
 high-level mcp server that scaffolds the **buddy bridge** studio map. it emits
-lua and ships it to roblox studio via the official `rbx-studio-mcp` (which
-exposes a `run_code` tool). the goal is one button — `build_preliminary_map`
-— that produces a tag-correct, attribute-correct, palette-consistent skeleton
-of the lobby, play arena slots, both level templates, npc rigs, item models,
-and the guide booth, ready for user 1 to polish in studio.
+lua and ships it to roblox studio via boshyxd's `robloxstudio-mcp` (which
+exposes an `execute_luau` tool). the goal is one button —
+`build_preliminary_map` — that produces a tag-correct, attribute-correct,
+palette-consistent skeleton of the lobby, play arena slots, both level
+templates, npc rigs, item models, and the guide booth, ready for user 1
+to polish in studio.
 
 read `prompts/user1_map_prompt.md` and `docs/TECHNICAL_DESIGN.md` first —
 those documents are the spec this generator implements.
@@ -50,6 +51,31 @@ judgment-call work: visual polish, decoration, tone.
 cd tools/map-generator
 pip install -e .
 ```
+
+## quick verification
+
+after installing the studio plugin and ticking "allow http requests":
+
+```bash
+# 1. unit tests (no studio needed)
+cd tools/map-generator
+python3 -m unittest discover tests
+# -> 53 tests pass
+
+# 2. dry-run the orchestrator (no studio needed)
+BUDDY_MAP_DRY_RUN=1 python3 -c "
+from buddy_map_generator.server import build_preliminary_map
+print(build_preliminary_map())
+"
+
+# 3. live build into studio (studio open with plugin running)
+python3 scripts/run_full_build.py
+# -> walks every step, screenshots into screenshots/00..09_*.png
+```
+
+if step 3 fails with "studio plugin connection timeout", the plugin is
+either not installed, not enabled, or studio isn't focused — check the
+plugin tab in studio for an "active" indicator.
 
 ## usage
 
