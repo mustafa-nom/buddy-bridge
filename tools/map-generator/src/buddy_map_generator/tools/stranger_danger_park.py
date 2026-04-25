@@ -23,9 +23,9 @@ from ..lua_emit import (
     clear_existing,
     find_or_create_path,
     make_billboard_gui,
-    make_disc,
     make_folder,
     make_model,
+    make_pad,
     make_part,
     make_wedge,
     set_attribute,
@@ -519,7 +519,7 @@ def _emit_npc_spawns_and_patrols(p: LuaProgram) -> None:
         var = f"spawn_{spawn_id}"
         p.line("do")
         p.line(
-            make_disc(
+            make_pad(
                 var,
                 parent="level",
                 name=spawn_id,
@@ -606,9 +606,10 @@ def emit_stranger_danger_park_lua() -> str:
     _emit_sidewalks(p, base_y=0)
     _emit_crosswalks(p, base_y=0)
 
-    # level entry — explorer arrives at the south sidewalk
+    # level entry — explorer arrives at the south sidewalk. make_pad keeps
+    # the part rotation identity so PivotTo doesn't tip the level over.
     p.line(
-        make_disc(
+        make_pad(
             "level_entry",
             parent="level",
             name="LevelEntry",
@@ -680,7 +681,7 @@ def emit_stranger_danger_park_lua() -> str:
         var = f"puppy_{spawn_id}"
         p.line("do")
         p.line(
-            make_disc(
+            make_pad(
                 var,
                 parent="level",
                 name=spawn_id,
