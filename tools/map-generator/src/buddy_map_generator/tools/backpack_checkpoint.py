@@ -19,8 +19,8 @@ from ..lua_emit import (
     clear_existing,
     find_or_create_path,
     make_billboard_gui,
-    make_disc,
     make_model,
+    make_pad,
     make_part,
     make_proximity_prompt,
     set_attribute,
@@ -87,9 +87,10 @@ def emit_backpack_checkpoint_lua() -> str:
         )
     )
 
-    # standing pad for the explorer (south of the belt)
+    # standing pad for the explorer (south of the belt). flat pad so the
+    # PivotTo origin doesn't tip the cloned level on its side.
     p.line(
-        make_disc(
+        make_pad(
             "level_entry",
             parent="level",
             name="LevelEntry",

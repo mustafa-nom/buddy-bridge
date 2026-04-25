@@ -19,7 +19,7 @@ from ..lua_emit import (
     clear_existing,
     find_or_create_path,
     make_billboard_gui,
-    make_disc,
+    make_pad,
     make_model,
     make_part,
     make_surface_gui,
@@ -208,9 +208,10 @@ def emit_booth_template_lua() -> str:
     )
     p.line(make_surface_gui("panel_gui", adornee="panel", face="Top"))
 
-    # guide spawn — invisible reference inside the booth
+    # guide spawn — flat pad with identity rotation so booth teleport doesn't
+    # tip the guide character on its side.
     p.line(
-        make_disc(
+        make_pad(
             "guide_spawn",
             parent="booth",
             name="GuideSpawn",

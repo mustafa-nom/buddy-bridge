@@ -20,9 +20,9 @@ from ..lua_emit import (
     cframe_pos,
     clear_existing,
     make_billboard_gui,
-    make_disc,
     make_folder,
     make_model,
+    make_pad,
     make_part,
     set_attribute,
 )
@@ -66,9 +66,11 @@ def emit_play_arena_slots_lua(*, slot_count: int = 4) -> str:
             )
         )
 
-        # explorer spawn — small invisible-ish hex marker on the western edge
+        # explorer spawn — flat pad at identity rotation. PlayAreaService
+        # uses this CFrame as the level clone's pivot origin, so rotation here
+        # would tip the whole cloned level. make_pad keeps it upright.
         p.line(
-            make_disc(
+            make_pad(
                 f"{slot_var}_xspawn",
                 parent=slot_var,
                 name="ExplorerSpawn",

@@ -215,6 +215,49 @@ def make_disc(
     return "\n".join(lines)
 
 
+def make_pad(
+    var_name: str,
+    *,
+    parent: str,
+    name: str,
+    diameter: float,
+    height: float,
+    cframe: str,
+    color_rgb: tuple[int, int, int] | None = None,
+    material_name: str = DEFAULT_MATERIAL,
+    transparency: float = 0,
+    can_collide: bool = True,
+    anchored: bool = True,
+    cast_shadow: bool = True,
+) -> str:
+    """flat square pad with identity rotation.
+
+    use this instead of make_disc for any part that's read as a teleport
+    target (ExplorerSpawn, GuideSpawn, LevelEntry, NpcSpawn, PuppySpawn) —
+    runtime code does `clone:PivotTo(origin.CFrame * ...)` and any rotation
+    on the source pad gets inherited by the cloned level. make_disc rotates
+    90deg around Z to point a Cylinder up, which would tip the whole level.
+    a flat block with identity rotation avoids the trap entirely.
+    """
+    color = color3(color_rgb) if color_rgb is not None else color3(PALETTE.grass)
+    lines = [
+        f"local {var_name} = Instance.new(\"Part\")",
+        f"{var_name}.Name = {lua_string(name)}",
+        f"{var_name}.Size = Vector3.new({diameter}, {height}, {diameter})",
+        f"{var_name}.CFrame = {cframe}",
+        f"{var_name}.Color = {color}",
+        f"{var_name}.Material = {material(material_name)}",
+        f"{var_name}.Anchored = {str(anchored).lower()}",
+        f"{var_name}.CanCollide = {str(can_collide).lower()}",
+        f"{var_name}.Transparency = {transparency}",
+        f"{var_name}.CastShadow = {str(cast_shadow).lower()}",
+        f"{var_name}.TopSurface = Enum.SurfaceType.Smooth",
+        f"{var_name}.BottomSurface = Enum.SurfaceType.Smooth",
+        f"{var_name}.Parent = {parent}",
+    ]
+    return "\n".join(lines)
+
+
 def make_wedge(
     var_name: str,
     *,
