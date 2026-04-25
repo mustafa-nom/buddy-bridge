@@ -145,6 +145,129 @@ def verify_style() -> dict[str, Any]:
     return _run_or_return(lua, label="verify_style")
 
 
+# preview tools — clone server-storage templates into workspace temporarily
+# so user 1 can visually verify a build step without leaving studio. each
+# preview replaces any prior _Preview folder, so calling preview_park then
+# preview_checkpoint won't pile up.
+
+_PREVIEW_HEADER = (
+    "local Workspace = game:GetService(\"Workspace\")\n"
+    "local ServerStorage = game:GetService(\"ServerStorage\")\n"
+    "local preview = Workspace:FindFirstChild(\"_Preview\")\n"
+    "if preview then preview:Destroy() end\n"
+    "preview = Instance.new(\"Folder\")\n"
+    "preview.Name = \"_Preview\"\n"
+    "preview.Parent = Workspace\n"
+)
+
+
+def _preview_lua(body: str) -> str:
+    return _PREVIEW_HEADER + body
+
+
+@mcp.tool()
+def preview_booth() -> dict[str, Any]:
+    """clone the booth template into workspace at (0, 0, 100) and aim camera."""
+    lua = _preview_lua(
+        "local b = ServerStorage.GuideBooths.DefaultBooth:Clone()\n"
+        "b:PivotTo(CFrame.new(0, 0, 100))\n"
+        "b.Parent = preview\n"
+        "Workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable\n"
+        "Workspace.CurrentCamera.CFrame = CFrame.new(Vector3.new(20, 12, 90), Vector3.new(0, 4, 100))\n"
+        "return \"booth previewed\"\n"
+    )
+    return _run_or_return(lua, label="preview_booth")
+
+
+@mcp.tool()
+def preview_park() -> dict[str, Any]:
+    """clone the StrangerDangerPark level into workspace at (0, 0, 200)."""
+    lua = _preview_lua(
+        "local lvl = ServerStorage.Levels.StrangerDangerPark:Clone()\n"
+        "lvl:PivotTo(CFrame.new(0, 0, 200))\n"
+        "lvl.Parent = preview\n"
+        "Workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable\n"
+        "Workspace.CurrentCamera.CFrame = CFrame.new(Vector3.new(80, 60, 130), Vector3.new(0, 4, 200))\n"
+        "return \"park previewed\"\n"
+    )
+    return _run_or_return(lua, label="preview_park")
+
+
+@mcp.tool()
+def preview_checkpoint() -> dict[str, Any]:
+    """clone the BackpackCheckpoint level into workspace at (0, 0, 300)."""
+    lua = _preview_lua(
+        "local lvl = ServerStorage.Levels.BackpackCheckpoint:Clone()\n"
+        "lvl:PivotTo(CFrame.new(0, 0, 300))\n"
+        "lvl.Parent = preview\n"
+        "Workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable\n"
+        "Workspace.CurrentCamera.CFrame = CFrame.new(Vector3.new(0, 16, 280), Vector3.new(0, 4, 305))\n"
+        "return \"checkpoint previewed\"\n"
+    )
+    return _run_or_return(lua, label="preview_checkpoint")
+
+
+@mcp.tool()
+def preview_npc_lineup() -> dict[str, Any]:
+    """clone every NpcTemplate side-by-side on a grass strip near (0, 0, 400)."""
+    lua = _preview_lua(
+        "local floor = Instance.new(\"Part\")\n"
+        "floor.Size = Vector3.new(80, 1, 16)\n"
+        "floor.CFrame = CFrame.new(0, -0.5, 400)\n"
+        "floor.Anchored = true\n"
+        "floor.Color = Color3.fromRGB(133, 196, 92)\n"
+        "floor.Material = Enum.Material.Grass\n"
+        "floor.Parent = preview\n"
+        "local i = 0\n"
+        "for _, tpl in ipairs(ServerStorage.NpcTemplates:GetChildren()) do\n"
+        "  local clone = tpl:Clone()\n"
+        "  clone:PivotTo(CFrame.new(-30 + i * 10, 1.5, 400) * CFrame.Angles(0, math.rad(180), 0))\n"
+        "  clone.Parent = preview\n"
+        "  i = i + 1\n"
+        "end\n"
+        "Workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable\n"
+        "Workspace.CurrentCamera.CFrame = CFrame.new(Vector3.new(0, 8, 380), Vector3.new(0, 3, 400))\n"
+        "return (\"placed \" .. i .. \" npcs\")\n"
+    )
+    return _run_or_return(lua, label="preview_npc_lineup")
+
+
+@mcp.tool()
+def preview_item_lineup() -> dict[str, Any]:
+    """clone every ItemTemplate side-by-side on a concrete pad at (0, 0, 500)."""
+    lua = _preview_lua(
+        "local floor = Instance.new(\"Part\")\n"
+        "floor.Size = Vector3.new(72, 1, 12)\n"
+        "floor.CFrame = CFrame.new(0, -0.5, 500)\n"
+        "floor.Anchored = true\n"
+        "floor.Color = Color3.fromRGB(212, 200, 178)\n"
+        "floor.Material = Enum.Material.Concrete\n"
+        "floor.Parent = preview\n"
+        "local i = 0\n"
+        "for _, tpl in ipairs(ServerStorage.ItemTemplates:GetChildren()) do\n"
+        "  local clone = tpl:Clone()\n"
+        "  clone:PivotTo(CFrame.new(-30 + i * 5, 1, 500))\n"
+        "  clone.Parent = preview\n"
+        "  i = i + 1\n"
+        "end\n"
+        "Workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable\n"
+        "Workspace.CurrentCamera.CFrame = CFrame.new(Vector3.new(0, 18, 484), Vector3.new(0, 1.5, 500))\n"
+        "return (\"placed \" .. i .. \" items\")\n"
+    )
+    return _run_or_return(lua, label="preview_item_lineup")
+
+
+@mcp.tool()
+def clear_preview() -> dict[str, Any]:
+    """remove the temporary _Preview folder from workspace."""
+    lua = (
+        "local preview = workspace:FindFirstChild(\"_Preview\")\n"
+        "if preview then preview:Destroy() end\n"
+        "return \"preview cleaned\"\n"
+    )
+    return _run_or_return(lua, label="clear_preview")
+
+
 @mcp.tool()
 def screenshot() -> dict[str, Any]:
     """capture a screenshot of the studio window. dry_run echoes a stub."""

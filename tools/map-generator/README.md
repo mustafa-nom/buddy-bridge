@@ -72,6 +72,10 @@ in the project dir picks it up automatically alongside the official
 - `verify_style` — walks the map and reports material / font / tag /
   structural drift
 - `screenshot` — captures the studio window
+- `preview_booth`, `preview_park`, `preview_checkpoint`, `preview_npc_lineup`,
+  `preview_item_lineup` — clone a server-storage template into workspace
+  temporarily and aim the camera. each call replaces the prior `_Preview`
+  folder so they don't pile up. `clear_preview` removes the folder.
 - `build_preliminary_map(...)` — runs every step in order, screenshots after
   each step
 - `dump_preliminary_map(...)` — concatenates every emitter into one labelled
