@@ -1,0 +1,27 @@
+# Rojo build output
+*.rbxl
+*.rbxlx
+*.rbxl.lock
+*.rbxlx.lock
+build.rbxl
+build.rbxlx
+
+# Roblox Studio
+*.rbxm
+*.rbxmx
+
+# Aftman
+.aftman/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Roblox-ts / Wally (if added later)
+node_modules/
+Packages/
+ServerPackages/
+DevPackages/
+sourcemap.json
