@@ -22,6 +22,8 @@ local DAMPING = 10
 local MAX_EXTRA_FORCE = 5200
 local BOB_HEIGHT = 0.28
 local BOB_SPEED = 3.1
+local BOAT_SEAT_BOARDING_RADIUS = 7
+local BOAT_BOARDING_HEIGHT_ABOVE_WATER = 0.4
 
 local humanoid: Humanoid? = nil
 local root: BasePart? = nil
@@ -94,6 +96,26 @@ local function waterBelow(): RaycastResult?
 	return nil
 end
 
+local function isSeatedOrBoardingBoat(waterY: number?): boolean
+	local currentRoot = root
+	local currentHumanoid = humanoid
+	if not currentRoot or not currentHumanoid then return false end
+	if currentHumanoid.Sit or currentHumanoid.SeatPart then return true end
+
+	if waterY and currentRoot.Position.Y <= waterY + BOAT_BOARDING_HEIGHT_ABOVE_WATER then
+		return false
+	end
+
+	for _, seat in ipairs(CollectionService:GetTagged(PhishConstants.Tags.BoatSeat)) do
+		if seat:IsA("Seat") or seat:IsA("VehicleSeat") then
+			if (seat.Position - currentRoot.Position).Magnitude <= BOAT_SEAT_BOARDING_RADIUS then
+				return true
+			end
+		end
+	end
+	return false
+end
+
 local function updateSwim()
 	local currentRoot = root
 	local currentHumanoid = humanoid
@@ -110,6 +132,11 @@ local function updateSwim()
 	end
 
 	local waterY = hit.Position.Y
+	if isSeatedOrBoardingBoat(waterY) then
+		setSwimming(false)
+		return
+	end
+
 	local rootY = currentRoot.Position.Y
 	local lowEnoughForWater = rootY <= waterY + ACTIVATE_ABOVE_SURFACE
 	local fallingIntoWater = currentHumanoid.FloorMaterial == Enum.Material.Air and rootY <= waterY + 9
