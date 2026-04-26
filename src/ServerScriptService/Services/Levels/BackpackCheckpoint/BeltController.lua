@@ -25,6 +25,7 @@ local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 
 local Services = script.Parent.Parent.Parent
 local ScoringService = require(Services:WaitForChild("ScoringService"))
+local DataService = require(Services:WaitForChild("DataService"))
 
 local BeltController = {}
 
@@ -280,6 +281,19 @@ function BeltController.SpawnItem(round, scenario, itemInfo, waveIndex: number, 
 		WaveIndex = waveIndex,
 	})
 
+	-- Field Manual session meta (P2): mark this key as encountered for both
+	-- members of the duo. If either crosses a "first time" threshold we push
+	-- a FieldManualUpdated delta so the Guide HUD can flag it as new.
+	local explorerNew = DataService.MarkItemEncountered(round.Explorer, itemInfo.ItemKey)
+	local guideNew = DataService.MarkItemEncountered(round.Guide, itemInfo.ItemKey)
+	if explorerNew or guideNew then
+		RemoteService.FirePair(round, "FieldManualUpdated", {
+			RoundId = round.RoundId,
+			NewKey = itemInfo.ItemKey,
+			Encountered = nil,
+		})
+	end
+
 	armFalloffTimer(round, scenario, onResolved)
 	return model
 end
@@ -377,6 +391,51 @@ function BeltController.GetHeldByPlayer(round): Player?
 	return state and state.HeldByPlayer or nil
 end
 
+-- Halt the belt: pause the fall-off timer for the active item and prevent
+-- new sorts (callers should typically also re-lock lanes). Used by Veto and
+-- Mini-Boss. Idempotent.
+function BeltController.HaltBelt(round)
+	local state = ensureLevelState(round)
+	if state.IsHalted then return end
+	state.IsHalted = true
+	-- Capture remaining fall-off time so we can re-arm with the same window.
+	if state.ActiveItemSpawnedAt then
+		local elapsed = os.clock() - state.ActiveItemSpawnedAt
+		state.RemainingFalloffOnHalt = math.max(0, Constants.BACKPACK_FALLOFF_SECONDS - elapsed)
+	end
+	cancelFalloffTimer(state)
+end
+
+-- Resume the belt after a halt. Re-arms the fall-off timer with the time
+-- that was remaining when the halt began (so the player gets exactly what
+-- they had left, not a fresh window). If no item is active, resume is a no-op.
+function BeltController.ResumeBelt(round)
+	local scenario = round.ActiveScenario
+	if not scenario or scenario.Type ~= LevelTypes.BackpackCheckpoint then return end
+	local state = ensureLevelState(round)
+	if not state.IsHalted then return end
+	state.IsHalted = false
+	if not state.ActiveItemModel or not state.OnResolved then
+		state.RemainingFalloffOnHalt = nil
+		return
+	end
+	-- Rearm with the remaining duration. armFalloffTimer reads the global
+	-- BACKPACK_FALLOFF_SECONDS, so we shift ActiveItemSpawnedAt to make the
+	-- "elapsed" math work.
+	local remaining = state.RemainingFalloffOnHalt or Constants.BACKPACK_FALLOFF_SECONDS
+	state.RemainingFalloffOnHalt = nil
+	state.ActiveItemSpawnedAt = os.clock() - (Constants.BACKPACK_FALLOFF_SECONDS - remaining)
+	armFalloffTimer(round, scenario, state.OnResolved)
+end
+
+function BeltController.IsHalted(round): boolean
+	local state = round.LevelState[LevelTypes.BackpackCheckpoint]
+	return state ~= nil and state.IsHalted == true
+end
+
+-- Rehydrate-for-Guide moved to GuideRehydrate.lua to keep this module
+-- under the 500-line ceiling.
+
 function BeltController.Cleanup(round)
 	local levelState = round.LevelState[LevelTypes.BackpackCheckpoint]
 	if not levelState then
@@ -392,6 +451,15 @@ function BeltController.Cleanup(round)
 	levelState.ScansUsedThisWave = nil
 	levelState.OnResolved = nil
 	levelState.IntroDismissedBy = nil
+	levelState.IsHalted = nil
+	levelState.RemainingFalloffOnHalt = nil
+	levelState.VetoUsed = nil
+	levelState.MiniBossActive = nil
+	levelState.MiniBoss = nil
+	levelState.MiniBossOnComplete = nil
+	levelState.MiniBossOnFail = nil
+	levelState.OnMiniBossFail = nil
+	levelState.ActiveItemSpawnedAt = nil
 	round.ActiveItemId = nil
 end
 

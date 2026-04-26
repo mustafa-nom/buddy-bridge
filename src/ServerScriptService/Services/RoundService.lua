@@ -32,7 +32,26 @@ function RoundService.GetRoundForPlayer(player: Player)
 	return RoundContext.GetRound(player)
 end
 
-local function startRoundForPair(pair)
+-- Validates a client-supplied level-sequence override (used by the test
+-- buttons in RoleSelectController). Only accepts known LevelTypes; rejects
+-- empties, dups, and unknowns. Returns nil if invalid so the caller falls
+-- back to the default DemoSequence.
+local function sanitizeLevelSequence(raw): { string }?
+	if typeof(raw) ~= "table" then return nil end
+	local out = {}
+	local seen: { [string]: boolean } = {}
+	for _, entry in ipairs(raw) do
+		if typeof(entry) ~= "string" then return nil end
+		if not LevelTypes.IsValid(entry) then return nil end
+		if seen[entry] then return nil end
+		seen[entry] = true
+		table.insert(out, entry)
+	end
+	if #out == 0 then return nil end
+	return out
+end
+
+local function startRoundForPair(pair, levelSequenceOverride: { string }?)
 	local explorer = RoleService.GetExplorer(pair.Id)
 	local guide = RoleService.GetGuide(pair.Id)
 	if not explorer or not guide then
@@ -51,6 +70,9 @@ local function startRoundForPair(pair)
 	end
 	local slotIndex = slot:GetAttribute("SlotIndex") or 0
 	local round = RoundState.New(explorer, guide, pair.Id, slotIndex)
+	if levelSequenceOverride then
+		round.LevelSequence = levelSequenceOverride
+	end
 	RoundContext.Register(round)
 
 	-- Build arena
@@ -87,7 +109,7 @@ local function startRoundForPair(pair)
 	LevelService.StartLevel(round, round.LevelSequence[1])
 end
 
-function RoundService.StartRoundForPlayer(player: Player)
+function RoundService.StartRoundForPlayer(player: Player, levelSequenceRaw: any?)
 	local pair = MatchService.GetPair(player)
 	if not pair then return end
 	if not RoleService.IsLocked(pair.Id) then
@@ -100,16 +122,17 @@ function RoundService.StartRoundForPlayer(player: Player)
 	end
 	-- Avoid double-start
 	if RoundContext.GetRoundByPairId(pair.Id) then return end
-	startRoundForPair(pair)
+	-- Test/debug shortcut: client may pass a level-sequence override (e.g.
+	-- play just BPC, or just SD). Validated server-side; bad input is
+	-- silently ignored and the default DemoSequence is used.
+	local sequence = sanitizeLevelSequence(levelSequenceRaw)
+	startRoundForPair(pair, sequence)
 end
 
 function RoundService.EndRound(round, reason: string?)
 	if not round then return end
 	if not round.IsActive then return end
 	round.IsActive = false
-	if reason == "FailedStrangerDanger" then
-		round.LevelState.FailedRun = true
-	end
 
 	-- Compute final score and grant rewards before tearing down arena.
 	local finalScore = ScoringService.CalculateFinalScore(round)
@@ -134,7 +157,6 @@ function RoundService.EndRound(round, reason: string?)
 
 	-- Cleanup level state and play area
 	LevelService.CleanupForRound(round)
-	PlayAreaService.TeleportPairToLobby(round)
 	PlayAreaService.TeardownArenaForRound(round)
 
 	RoundContext.Unregister(round)
@@ -158,8 +180,8 @@ function RoundService.Init()
 		return RoundState.SnapshotForClient(round)
 	end)
 
-	RemoteService.OnServerEvent("StartRound", function(player)
-		RoundService.StartRoundForPlayer(player)
+	RemoteService.OnServerEvent("StartRound", function(player, levelSequenceRaw)
+		RoundService.StartRoundForPlayer(player, levelSequenceRaw)
 	end)
 
 	RemoteService.OnServerEvent("ReturnToLobby", function(player)

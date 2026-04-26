@@ -18,6 +18,7 @@ local LevelTypes = require(Modules:WaitForChild("LevelTypes"))
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 
 local BeltController = require(script.Parent:WaitForChild("BeltController"))
+local MiniBossDirector = require(script.Parent:WaitForChild("MiniBossDirector"))
 
 local WaveDirector = {}
 
@@ -93,7 +94,16 @@ function WaveDirector.FinishWave(round, scenario, onLevelComplete: () -> ())
 	})
 	local nextWaveIndex = waveIndex + 1
 	if nextWaveIndex > #scenario.Waves then
-		onLevelComplete()
+		-- Last wave done → Mini-Boss VIP bag, then level complete.
+		local state = getState(round)
+		local onFail = state.OnMiniBossFail
+		task.delay(0.8, function()
+			if not round.IsActive then return end
+			if scenario ~= round.ActiveScenario then return end
+			MiniBossDirector.Begin(round, scenario, onLevelComplete, function()
+				if onFail then onFail() end
+			end)
+		end)
 		return
 	end
 	-- Brief breather between waves so the HUD can play a transition.
@@ -104,7 +114,12 @@ function WaveDirector.FinishWave(round, scenario, onLevelComplete: () -> ())
 	end)
 end
 
-function WaveDirector.Begin(round, scenario, onLevelComplete: () -> ())
+function WaveDirector.Begin(round, scenario, onLevelComplete: () -> (), onMiniBossFail: (() -> ())?)
+	-- Per-round state lives on round.LevelState[BPC], not on the module.
+	-- This is the rule from the addendum's edge case 32: 4 concurrent duos
+	-- must not cross-talk via module-level mutable state.
+	local state = getState(round)
+	state.OnMiniBossFail = onMiniBossFail
 	startWave(round, scenario, 1, onLevelComplete)
 end
 

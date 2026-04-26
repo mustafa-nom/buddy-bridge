@@ -21,11 +21,13 @@ local Modules = ReplicatedStorage:WaitForChild("Modules")
 local Constants = require(Modules:WaitForChild("Constants"))
 local LevelTypes = require(Modules:WaitForChild("LevelTypes"))
 local ItemRegistry = require(Modules:WaitForChild("ItemRegistry"))
+local ScoringConfig = require(Modules:WaitForChild("ScoringConfig"))
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 
 local Services = script.Parent
 local Helpers = Services:WaitForChild("Helpers")
 local RemoteValidation = require(Helpers:WaitForChild("RemoteValidation"))
+local ScoringService = require(Services:WaitForChild("ScoringService"))
 local Levels = Services:WaitForChild("Levels")
 local BackpackCheckpointLevel = require(Levels:WaitForChild("BackpackCheckpointLevel"))
 
@@ -161,6 +163,68 @@ local function handleUnlockLane(player: Player, lane: string)
 	end
 end
 
+local function handleVeto(player: Player)
+	local okPlayer = RemoteValidation.RequirePlayer(player)
+	if not okPlayer then return end
+	local okRound, _, round = RemoteValidation.RequireRound(player)
+	if not okRound or not round then return end
+	local okRole = RemoteValidation.RequireGuide(player)
+	if not okRole then return end
+	local okLevel = RemoteValidation.RequireLevelType(round, LevelTypes.BackpackCheckpoint)
+	if not okLevel then return end
+	local okRate = RemoteValidation.RequireRateLimit(player, "RequestVeto", Constants.RATE_LIMIT_VETO)
+	if not okRate then return end
+
+	local state = getState(round)
+	-- Edge case 12: no active item → disallow.
+	if not round.ActiveItemId or not state.ActiveItemModel then
+		RemoteService.FireClient(round.Guide, "Notify", {
+			Kind = "Info",
+			Text = "Nothing on the belt to veto.",
+		})
+		return
+	end
+	if state.VetoUsed then
+		RemoteService.FireClient(round.Guide, "Notify", {
+			Kind = "Info",
+			Text = "Veto already used this round.",
+		})
+		return
+	end
+	state.VetoUsed = true
+
+	-- Edge case 15: cost combo by halving (not zeroing) — encourages "use it
+	-- when it matters" without nuking the run.
+	ScoringService.ReduceStreak(round, ScoringConfig.VetoComboDivisor)
+
+	-- Edge case 13: during Mini-Boss the belt is already halted, but Veto
+	-- still costs the charge and re-locks lanes so the Guide must reconfirm.
+	-- BeltController.HaltBelt is idempotent so it's safe to call regardless.
+	BackpackCheckpointLevel.HaltBelt(round)
+	-- Re-lock all lanes (edge case 14: if Explorer is mid-carry, they can
+	-- still walk back; placement just blocks until lanes re-arm).
+	for laneName in pairs(ItemRegistry.Lanes) do
+		BackpackCheckpointLevel.SetLaneLock(round, laneName, true)
+	end
+
+	RemoteService.FirePair(round, "VetoActivated", {
+		RoundId = round.RoundId,
+		DurationSeconds = Constants.BACKPACK_VETO_FREEZE_SECONDS,
+	})
+
+	task.delay(Constants.BACKPACK_VETO_FREEZE_SECONDS, function()
+		if not round.IsActive then return end
+		local s = round.LevelState[LevelTypes.BackpackCheckpoint]
+		-- Don't auto-resume if Mini-Boss took over the halt.
+		if s and not s.MiniBossActive then
+			BackpackCheckpointLevel.ResumeBelt(round)
+		end
+		RemoteService.FirePair(round, "VetoEnded", {
+			RoundId = round.RoundId,
+		})
+	end)
+end
+
 local function handleDismissIntro(player: Player)
 	local okPlayer = RemoteValidation.RequirePlayer(player)
 	if not okPlayer then return end
@@ -168,17 +232,28 @@ local function handleDismissIntro(player: Player)
 	if not okRound or not round then return end
 	local okRate = RemoteValidation.RequireRateLimit(player, "RequestDismissIntro", Constants.RATE_LIMIT_DISMISS_INTRO)
 	if not okRate then return end
-	-- P0 non-gating: just record dismissal so the P2 gated version can read
-	-- it without a server roundtrip. Wave 1 has already started.
+
 	local state = getState(round)
 	state.IntroDismissedBy = state.IntroDismissedBy or {}
 	state.IntroDismissedBy[player] = true
+
+	-- P2 gating: fire the gate as soon as BOTH players have dismissed.
+	-- The gate also self-fires on timeout (set in BackpackCheckpointLevel).
+	if state.IntroGate
+		and state.IntroDismissedBy[round.Explorer]
+		and state.IntroDismissedBy[round.Guide]
+	then
+		local gate = state.IntroGate
+		state.IntroGate = nil
+		gate()
+	end
 end
 
 function ScannerService.Init()
 	RemoteService.OnServerEvent("RequestScanItem", handleScanItem)
 	RemoteService.OnServerEvent("RequestHighlightItem", handleHighlightItem)
 	RemoteService.OnServerEvent("RequestUnlockLane", handleUnlockLane)
+	RemoteService.OnServerEvent("RequestVeto", handleVeto)
 	RemoteService.OnServerEvent("RequestDismissIntro", handleDismissIntro)
 end
 
