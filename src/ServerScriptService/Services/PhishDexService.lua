@@ -9,6 +9,10 @@ local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 local Services = script.Parent
 local DataService = require(Services:WaitForChild("DataService"))
 
+-- Flip to false to silence the dev-time fire logs once we've confirmed
+-- the SpeciesFound / SpeciesUnlocked pipeline is healthy.
+local DEBUG = true
+
 local PhishDexService = {}
 
 function PhishDexService.Init()
@@ -45,7 +49,23 @@ function PhishDexService.RecordFound(player: Player, speciesId: string)
 	if not species then return end
 
 	local profile = DataService.Get(player)
+	if profile.foundSpecies[speciesId] then return end
 	profile.foundSpecies[speciesId] = true
+
+	if DEBUG then
+		print(string.format(
+			"[PhishDex] SpeciesFound fired for %s -> %s",
+			player.Name, speciesId
+		))
+	end
+
+	-- One-shot popup the first time a player ever sees this species.
+	RemoteService.FireClient(player, "SpeciesFound", {
+		id = species.id,
+		displayName = species.displayName,
+		rarity = species.rarity,
+		isLegit = species.isLegit,
+	})
 end
 
 -- Called after a correct catch. `speciesId` matches a PhishDex.Species.id.
@@ -53,8 +73,11 @@ function PhishDexService.RecordCatch(player: Player, speciesId: string)
 	local species = PhishDex.Get(speciesId)
 	if not species then return end
 
+	-- Funnel the "first encounter" bookkeeping through RecordFound so the
+	-- SpeciesFound popup fires exactly once per profile.
+	PhishDexService.RecordFound(player, speciesId)
+
 	local profile = DataService.Get(player)
-	profile.foundSpecies[speciesId] = true
 	local prev = profile.unlockedSpecies[speciesId] or 0
 	local next_ = prev + 1
 	profile.unlockedSpecies[speciesId] = next_
@@ -63,6 +86,7 @@ function PhishDexService.RecordCatch(player: Player, speciesId: string)
 		RemoteService.FireClient(player, "SpeciesUnlocked", {
 			id = species.id,
 			displayName = species.displayName,
+			rarity = species.rarity,
 			realPatternName = species.realPatternName,
 			realWorldInfo = species.realWorldInfo,
 			defenseStrategy = species.defenseStrategy,

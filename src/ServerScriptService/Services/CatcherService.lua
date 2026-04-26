@@ -17,6 +17,7 @@ local ScamCards = require(ServerStorage:WaitForChild("ScamCards"))
 local Services = script.Parent
 local DataService = require(Services:WaitForChild("DataService"))
 local GearService = require(Services:WaitForChild("GearService"))
+local PhishDexService = require(Services:WaitForChild("PhishDexService"))
 local Helpers = Services:WaitForChild("Helpers")
 local RemoteValidation = require(Helpers:WaitForChild("RemoteValidation"))
 
@@ -200,7 +201,10 @@ local function startLoop(player: Player, deployId: string, catcher: CatcherCatal
 			local value = sellValueFor(card, catcher, pos)
 			profile.catcherInventory[speciesId] = (profile.catcherInventory[speciesId] or 0) + 1
 			profile.catcherInventoryValue += value
-			profile.foundSpecies[speciesId] = true
+			-- Route through PhishDexService so the SpeciesFound popup fires the
+			-- first time a passive catcher discovers a new species, just like a
+			-- manual catch via DecisionService does.
+			PhishDexService.RecordFound(player, speciesId)
 			deployment.storedCount = (deployment.storedCount or 0) + 1
 			deployment.lastCatchSpecies = speciesId
 			deployment.lastCatchValue = value

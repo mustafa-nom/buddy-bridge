@@ -90,6 +90,30 @@ These get set in Studio so the Lua services can `CollectionService:GetTagged(...
 - [ ] Game description mentions "fishing" + "online safety" framing
 - [ ] Submit to the LAHacks Roblox Civility Challenge per their submission instructions
 
+## Fish art uploads (Fish Index + NEW! popup)
+
+The `[src/ReplicatedStorage/Modules/FishArt.lua](src/ReplicatedStorage/Modules/FishArt.lua)` table maps every PhishDex species to a Roblox decal asset id. While each id is `0`, the Fish Index falls back to the 3D viewport preview and the popup falls back to a small placeholder — both work, but the art won't show. To wire up the 2D Gemini stickers:
+
+1. In `~/.cursor/projects/Users-mustafanomair-buddy-bridge/assets/`, rename each species PNG to `<speciesId>.png` exactly matching `id` in `[src/ReplicatedStorage/Modules/PhishDex.lua](src/ReplicatedStorage/Modules/PhishDex.lua)`. The 12 ids are:
+   - `UrgencyEel.png`
+   - `AuthorityAnglerfish.png`
+   - `RewardTuna.png`
+   - `CuriosityCatfish.png`
+   - `FearBass.png`
+   - `FamiliarityFlounder.png`
+   - `RumorRay.png`
+   - `ModImposter.png`
+   - `HallucinationJelly.png`
+   - `PlainCarp.png`
+   - `HonestHerring.png`
+   - `KindnessKoi.png`
+   - The reference image (`image-ce55d390...png`, the Yello Damselfish) is **not** used.
+2. Upload each PNG via either path:
+   - **Creator Dashboard**: `https://create.roblox.com/dashboard/creations` → Decals → Upload. Copy the numeric id from the resulting URL.
+   - **Studio Asset Manager**: View → Asset Manager → Images → Add. Right-click the imported image → "Copy ID to Clipboard".
+3. Paste each numeric id into the matching slot in `[src/ReplicatedStorage/Modules/FishArt.lua](src/ReplicatedStorage/Modules/FishArt.lua)`. Plain integer; the module wraps it as `rbxassetid://<id>` automatically.
+4. Save, sync via Rojo, test by catching a fish — the top-right `NEW!` popup should display the sticker, and the Fish Index tile should switch from the 3D viewport to the 2D image.
+
 ## Out of Scope (do not build in Studio)
 
 - Multiple ponds beyond Starter Cove

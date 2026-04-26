@@ -6,7 +6,9 @@
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
-local UIStyle = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("UIStyle"))
+local Modules = ReplicatedStorage:WaitForChild("Modules")
+local UIStyle = require(Modules:WaitForChild("UIStyle"))
+local FishArt = require(Modules:WaitForChild("FishArt"))
 local UIBuilder = require(script.Parent:WaitForChild("UIBuilder"))
 
 local screen = UIBuilder.GetScreenGui()
@@ -25,17 +27,47 @@ local function rarityColor(rarity: string?): Color3
 	return UIStyle.Palette.Common
 end
 
-local function buildFishPreview(speciesId: string, found: boolean, parent: Instance): ViewportFrame
+-- Preview slot: wider/taller than the original viewport box so the wide
+-- 2D fish art reads as a proper sticker instead of a thin sliver. Tile
+-- height stays 168, so labels below shift up a touch (see grid loop).
+local PREVIEW_ANCHOR = Vector2.new(0.5, 0.5)
+local PREVIEW_POS = UDim2.new(0.5, 0, 0, 48)
+local PREVIEW_SIZE = UDim2.fromOffset(134, 72)
+local PREVIEW_ZINDEX = 5
+
+local function buildImagePreview(speciesId: string, found: boolean, parent: Instance): ImageLabel
+	local img = Instance.new("ImageLabel")
+	img.Name = "FishPreview"
+	img.AnchorPoint = PREVIEW_ANCHOR
+	img.Position = PREVIEW_POS
+	img.Size = PREVIEW_SIZE
+	img.BackgroundTransparency = 1
+	img.ScaleType = Enum.ScaleType.Fit
+	img.Image = FishArt.Get(speciesId) or ""
+	img.ZIndex = PREVIEW_ZINDEX
+	if not found then
+		-- Silhouette: lift the tint off the dark CardSlot background so
+		-- the fish shape is still readable for unseen species. The old
+		-- (40,40,50) + 0.15 transparency was nearly invisible against
+		-- CardSlot (22,16,24).
+		img.ImageColor3 = Color3.fromRGB(75, 70, 95)
+		img.ImageTransparency = 0
+	end
+	img.Parent = parent
+	return img
+end
+
+local function buildViewportPreview(speciesId: string, found: boolean, parent: Instance): ViewportFrame
 	local vf = Instance.new("ViewportFrame")
 	vf.Name = "FishPreview"
-	vf.AnchorPoint = Vector2.new(0.5, 0.5)
-	vf.Position = UDim2.new(0.5, 0, 0, 50)
-	vf.Size = UDim2.fromOffset(94, 60)
+	vf.AnchorPoint = PREVIEW_ANCHOR
+	vf.Position = PREVIEW_POS
+	vf.Size = PREVIEW_SIZE
 	vf.BackgroundTransparency = 1
 	vf.Ambient = Color3.fromRGB(150, 140, 130)
 	vf.LightColor = Color3.fromRGB(255, 240, 210)
 	vf.LightDirection = Vector3.new(-0.4, -1, -0.25)
-	vf.ZIndex = 5
+	vf.ZIndex = PREVIEW_ZINDEX
 	vf.Parent = parent
 
 	local template = fishTemplates:FindFirstChild(speciesId)
@@ -60,6 +92,15 @@ local function buildFishPreview(speciesId: string, found: boolean, parent: Insta
 	cam.Parent = vf
 	vf.CurrentCamera = cam
 	return vf
+end
+
+-- Prefer the 2D sticker art when an asset id is wired up. Fall back to the
+-- 3D viewport so the index keeps working before any uploads are done.
+local function buildFishPreview(speciesId: string, found: boolean, parent: Instance): GuiObject
+	if FishArt.Has(speciesId) then
+		return buildImagePreview(speciesId, found, parent)
+	end
+	return buildViewportPreview(speciesId, found, parent)
 end
 
 local open: () -> ()
@@ -166,9 +207,11 @@ open = function()
 		-- backdrop. The rarity color is conveyed via the rarity label.
 		buildFishPreview(tostring(e.id or ""), found, tile)
 
+		-- Labels sit just below the 134x72 preview (bottom edge ~y=84).
+		-- Spacing chosen so all three labels fit cleanly inside the 168px tile.
 		UIStyle.MakeLabel({
 			Size = UDim2.new(1, -12, 0, 20),
-			Position = UDim2.fromOffset(6, 100),
+			Position = UDim2.fromOffset(6, 94),
 			Text = found and (e.displayName or "?") or "???",
 			Font = UIStyle.FontBold,
 			TextSize = UIStyle.TextSize.Body,
@@ -180,7 +223,7 @@ open = function()
 
 		UIStyle.MakeLabel({
 			Size = UDim2.new(1, -12, 0, 14),
-			Position = UDim2.fromOffset(6, 122),
+			Position = UDim2.fromOffset(6, 118),
 			Text = string.upper(e.rarity or "Common"),
 			Font = UIStyle.FontBold,
 			TextSize = UIStyle.TextSize.Caption,
@@ -191,7 +234,7 @@ open = function()
 
 		UIStyle.MakeLabel({
 			Size = UDim2.new(1, -12, 0, 14),
-			Position = UDim2.fromOffset(6, 138),
+			Position = UDim2.fromOffset(6, 136),
 			Text = mastered
 				and string.format("%d / %d · MASTERED", e.count or 0, e.catchesToUnlock or 3)
 				or (found
