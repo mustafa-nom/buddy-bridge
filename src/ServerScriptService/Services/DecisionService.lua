@@ -103,7 +103,10 @@ local function onSubmitDecision(player: Player, payload: any)
 	local actuallyLegit = card.isLegit == true
 	local wasCorrect = (playerSaidLegit == actuallyLegit)
 
-	PhishDexService.RecordFound(player, card.species)
+	-- Only record the species (and fire the NEW! / CAUGHT! popup) on a
+	-- correct decision. A wrong call is a failed catch — no dex entry,
+	-- no popup. RecordCatch internally calls RecordFound so the first
+	-- correct catch still gets the NEW! card.
 	local profile = DataService.Get(player)
 	local xpBefore = profile.xp
 	local rewardDelta = ScoringService.GrantCatchReward(player, wasCorrect, card)
