@@ -78,12 +78,13 @@ local function start(payload: any)
 	gui.Parent = screen.Parent
 	activeGui = gui
 
-	-- Outer panel: title + bar + countdown.
+	-- Outer panel: title + tooltip + bar + countdown. Panel grew taller to
+	-- fit the how-to-play strip between the title and the bar.
 	local panel = UIStyle.MakePanel({
 		Name = "SkillCheckPanel",
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -120),
-		Size = UDim2.fromOffset(BAR_WIDTH + 64, BAR_HEIGHT + 96),
+		Size = UDim2.fromOffset(BAR_WIDTH + 64, BAR_HEIGHT + 130),
 		BackgroundColor3 = UIStyle.Palette.Panel,
 		Parent = gui,
 	})
@@ -100,6 +101,32 @@ local function start(payload: any)
 		TextColor3 = UIStyle.Palette.TitleGold,
 		Parent = panel,
 	})
+
+	-- Inline how-to-play tooltip. Sits between the title and the bar so
+	-- a first-time player learns the controls without a modal.
+	local tip = Instance.new("Frame")
+	tip.Name = "Tip"
+	tip.AnchorPoint = Vector2.new(0.5, 0)
+	tip.Position = UDim2.new(0.5, 0, 0, 40)
+	tip.Size = UDim2.fromOffset(BAR_WIDTH, 28)
+	tip.BackgroundColor3 = UIStyle.Palette.CardSlot
+	tip.BackgroundTransparency = 0.2
+	tip.BorderSizePixel = 0
+	tip.Parent = panel
+	UIStyle.ApplyCorner(tip, UDim.new(0, 6))
+	UIStyle.ApplyStroke(tip, UIStyle.Palette.SlotStroke, 1)
+	UIStyle.MakeLabel({
+		Size = UDim2.new(1, -16, 1, 0),
+		Position = UDim2.fromOffset(8, 0),
+		Text = "<b>Hold click</b> to move right · <b>release</b> to drift left · stay in the <b>green</b>",
+		Font = UIStyle.FontBold,
+		TextSize = UIStyle.TextSize.Caption,
+		TextColor3 = UIStyle.Palette.TextPrimary,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		RichText = true,
+		Parent = tip,
+	})
+
 	local timerLabel = UIStyle.MakeLabel({
 		Name = "Timer",
 		AnchorPoint = Vector2.new(0.5, 1),
@@ -112,11 +139,11 @@ local function start(payload: any)
 		Parent = panel,
 	})
 
-	-- The bar itself.
+	-- The bar itself. Pulled down a bit so the tooltip has space above it.
 	local bar = Instance.new("Frame")
 	bar.Name = "Bar"
 	bar.AnchorPoint = Vector2.new(0.5, 0.5)
-	bar.Position = UDim2.new(0.5, 0, 0.5, 4)
+	bar.Position = UDim2.new(0.5, 0, 0.5, 18)
 	bar.Size = UDim2.fromOffset(BAR_WIDTH, BAR_HEIGHT)
 	bar.BackgroundColor3 = UIStyle.Palette.CardSlot
 	bar.BorderSizePixel = 0
