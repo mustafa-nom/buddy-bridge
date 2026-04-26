@@ -118,18 +118,18 @@ local function buildRodCard(parent: Instance, rod: RodCatalog.Rod): Frame
 	local _ = viewport
 
 	local nameLabel = UIStyle.MakeLabel({
-		Size = UDim2.new(1, -16, 0, 26),
-		Position = UDim2.new(0, 8, 0.55, 4),
+		Size = UDim2.new(1, -16, 0, 22),
+		Position = UDim2.new(0, 8, 0.5, 6),
 		Text = rod.name,
-		Font = UIStyle.FontBold, TextSize = UIStyle.TextSize.Heading,
+		Font = UIStyle.FontBold, TextSize = UIStyle.TextSize.Body,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		Parent = card,
 	})
 	local _ = nameLabel
 
 	UIStyle.MakeLabel({
-		Size = UDim2.new(1, -16, 0, 16),
-		Position = UDim2.new(0, 8, 0.55, 32),
+		Size = UDim2.new(1, -16, 0, 14),
+		Position = UDim2.new(0, 8, 0.5, 30),
 		Text = string.format("Tier %d", rod.tier),
 		TextSize = UIStyle.TextSize.Caption,
 		TextColor3 = UIStyle.Palette.TextMuted,
@@ -137,8 +137,8 @@ local function buildRodCard(parent: Instance, rod: RodCatalog.Rod): Frame
 	})
 
 	UIStyle.MakeLabel({
-		Size = UDim2.new(1, -16, 0, 50),
-		Position = UDim2.new(0, 8, 0.55, 52),
+		Size = UDim2.new(1, -16, 0, 36),
+		Position = UDim2.new(0, 8, 0.5, 48),
 		Text = rod.description,
 		TextSize = UIStyle.TextSize.Caption,
 		TextWrapped = true,
@@ -150,18 +150,18 @@ local function buildRodCard(parent: Instance, rod: RodCatalog.Rod): Frame
 	-- (We avoid emoji glyphs because Roblox's Cartoon font renders them as tofu.)
 	local priceFrame = Instance.new("Frame")
 	priceFrame.Name = "PriceRow"
-	priceFrame.Size = UDim2.new(1, -16, 0, 22)
-	priceFrame.Position = UDim2.new(0, 8, 1, -64)
+	priceFrame.Size = UDim2.new(1, -16, 0, 20)
+	priceFrame.Position = UDim2.new(0, 8, 1, -56)
 	priceFrame.BackgroundTransparency = 1
 	priceFrame.Parent = card
-	local _, priceLabel = IconFactory.Pill(priceFrame, IconFactory.Coin(20),
+	local _, priceLabel = IconFactory.Pill(priceFrame, IconFactory.Coin(18),
 		"", UIStyle.Palette.TextPrimary, UIStyle.TextSize.Body)
 
 	local buyBtn = UIStyle.MakeButton({
-		Size = UDim2.new(1, -16, 0, 38),
-		Position = UDim2.new(0, 8, 1, -42),
+		Size = UDim2.new(1, -16, 0, 30),
+		Position = UDim2.new(0, 8, 1, -34),
 		Text = "BUY",
-		TextSize = UIStyle.TextSize.Heading,
+		TextSize = UIStyle.TextSize.Body,
 		BackgroundColor3 = UIStyle.Palette.Safe,
 		Parent = card,
 	})
@@ -214,8 +214,8 @@ local function openShop()
 		Parent = shopGui,
 	})
 	local panelConstraint = Instance.new("UISizeConstraint")
-	panelConstraint.MinSize = Vector2.new(560, 420)
-	panelConstraint.MaxSize = Vector2.new(1100, 620)
+	panelConstraint.MinSize = Vector2.new(480, 360)
+	panelConstraint.MaxSize = Vector2.new(1000, 560)
 	panelConstraint.Parent = panel
 
 	UIStyle.MakeLabel({
@@ -243,20 +243,26 @@ local function openShop()
 	closeBtn.MouseButton1Click:Connect(closeShop)
 
 	-- Card grid. UIGridLayout wraps cards onto multiple rows when the panel
-	-- is narrow, so the layout stays sane on phone / laptop / desktop.
-	local row = Instance.new("Frame")
+	-- is narrow; ScrollingFrame ensures wrapped rows stay reachable on
+	-- small laptops where everything used to clip.
+	local row = Instance.new("ScrollingFrame")
 	row.Name = "Cards"
-	row.AnchorPoint = Vector2.new(0.5, 0.5)
-	row.Position = UDim2.new(0.5, 0, 0.55, 0)
-	row.Size = UDim2.new(1, -32, 1, -90)
+	row.Position = UDim2.new(0, 16, 0, 72)
+	row.Size = UDim2.new(1, -32, 1, -88)
 	row.BackgroundTransparency = 1
+	row.BorderSizePixel = 0
+	row.ScrollBarThickness = 6
+	row.ScrollBarImageColor3 = UIStyle.Palette.PanelStroke
+	row.ScrollingDirection = Enum.ScrollingDirection.Y
+	row.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	row.CanvasSize = UDim2.new(0, 0, 0, 0)
 	row.Parent = panel
 
 	local grid = Instance.new("UIGridLayout")
-	grid.CellSize = UDim2.fromOffset(220, 340)
-	grid.CellPadding = UDim2.fromOffset(16, 16)
+	grid.CellSize = UDim2.fromOffset(200, 280)
+	grid.CellPadding = UDim2.fromOffset(12, 12)
 	grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	grid.VerticalAlignment = Enum.VerticalAlignment.Center
+	grid.VerticalAlignment = Enum.VerticalAlignment.Top
 	grid.SortOrder = Enum.SortOrder.LayoutOrder
 	grid.Parent = row
 
