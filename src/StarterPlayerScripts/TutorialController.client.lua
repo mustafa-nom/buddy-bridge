@@ -396,7 +396,19 @@ local function gotoStage4()
 	stage = 4
 	showBanner("Nice catch!",
 		"Every fish you catch teaches you a phishing pattern. Keep fishing and check your Field Guide!",
-		{ sticky = false, durationSec = 6 })
+		{ sticky = true })
+	-- Final stage: nuke EVERYTHING after 6 seconds — banner, chip, arrow,
+	-- beam — regardless of whether the player minimized it. Previously the
+	-- non-sticky timer in showBanner only cleared the banner if it was
+	-- still the active one, so a minimized chip persisted forever.
+	task.delay(6, function()
+		clearBanner()
+		clearChip()
+		clearArrow()
+		clearBeam()
+		currentTitle = ""
+		currentText = ""
+	end)
 end
 
 local function alreadyHasRod(character: Model): boolean
