@@ -1,201 +1,331 @@
-# User 2 — Scripting Prompt (Rojo + Claude Code)
+# User 2 — PHISH! Scripting Prompt (Lua + Rojo)
 
-> Paste this prompt into your Claude Code session. You are the **Scripting User**. You write all Lua via Rojo. You do **not** open Roblox Studio to build geometry — that is User 1's job.
+> Paste this entire file into your Claude Code session. You are **User 2**. You own all Lua under `src/`. You do **not** open Roblox Studio to build geometry — that is User 1's job. You and User 1 work in parallel against a shared tag/attribute contract (see below) so that your work merges cleanly.
 
 ---
 
-## Prompt
+## Mission
 
-You are working on **Buddy Bridge: A Two Player Trust Game**, a 2-player asymmetric co-op safety game for the LAHacks Roblox Civility Challenge. The team is targeting Roblox's **"Learn and Explore"** sort.
+Build the entire **PHISH!** Lua codebase. PHISH! is a cozy retro-tropical fishing game where every fish is a digital citizenship moment in disguise (phishing scams, rumors, AI hallucinations, fake mods, kindness). Player spawns at a Lodge, casts into water tiles, picks the right verb (Cast / Verify / Reel / Cut Line / Report / Release) for each fish, sells catches at the sell-shop for **Pearls** (currency), buys better rods/lures at the fisherman shop, unlocks harder colored water zones with rarer fish. A rowboat with hovercraft physics lets the player drive to deeper waters with up to 3 friends.
 
-Before doing anything, read these files in this order and treat them as authoritative:
+Your job is everything in `src/`: services, controllers, registries, UIs, remotes, physics, economy. User 1 is building the Studio map in parallel. Your contract with User 1 is the **tag/attribute spec** at the bottom of this prompt. Read tags via `CollectionService`; never reach into specific instance paths except the named anchors User 1 promises to place.
 
-1. `CLAUDE.md`
-2. `docs/PRD.md`
-3. `docs/GAME_DESIGN.md`
-4. `docs/TECHNICAL_DESIGN.md`
-5. `docs/MVP_SCOPE.md`
-6. `docs/JUDGING_STRATEGY.md`
-7. `tasks/todo.md`
-8. `tasks/lessons.md`
-9. `human_todo.md`
-10. `prompts/user1_map_prompt.md` (so you know exactly what tags / attributes / model names to expect from the map)
+---
 
-Then read this prompt to understand your scope.
+## First Action
 
-### Your Role
+Run these in parallel before doing anything else:
 
-You are the **Scripting User**. Your scope:
+1. Read `CLAUDE.md`
+2. Read `docs/GAMEDESIGN.md`
+3. Read `docs/PHISH_CORE_LOOP.md` (this is your engineering bible — sequence diagram, remote list, state machine all here)
+4. Read `docs/PHISH_CONTENT.md` (FishRegistry data spec)
+5. Read `docs/PHISH_MVP_PLAN.md`
+6. List `src/` to see the current Buddy Bridge code that needs archiving (P1)
+7. Read existing reusable modules: `src/StarterPlayerScripts/Guide/BookView.lua` (you'll repurpose for Field Guide), `src/ServerScriptService/Services/Levels/BackpackCheckpoint/BeltController.lua` (timing pattern for reel mini-game), `src/ReplicatedStorage/RemoteService.lua` (extend for PHISH! remotes), `src/ReplicatedStorage/Modules/RateLimiter.lua`, `src/ReplicatedStorage/Modules/UIStyle.lua`
 
-- Implement every Lua module under `src/` to make Buddy Bridge playable end-to-end.
-- Define and create all `RemoteEvent` / `RemoteFunction` instances at runtime via `RemoteService.lua`.
-- Wire client controllers to UI built in code.
-- Handle all server logic: pairing, role assignment, round orchestration, level scenarios, scoring, rewards.
-- Keep every file under 500 lines.
-- Maintain server authority — never trust the client for gameplay truth.
+Then enter plan mode, write your build plan to `tasks/user2_code.md`, and only start coding once you have a P1 → P2 → P3 sequence with smoke-test checkpoints.
 
-You do **NOT**:
-- Open Roblox Studio to build or edit geometry, lobby pads, play arena slots, level templates, NPC templates, item templates, or the booth template. User 1 builds those.
-- Add scripts directly inside Studio — everything goes through Rojo from `src/`.
-- Modify CollectionService tags or Instance attributes that User 1 set on the map. If you need a new tag or attribute, update `docs/TECHNICAL_DESIGN.md` and `human_todo.md` and tell User 1.
+---
 
-### Toolchain
+## Game Loop (so you build the right systems)
 
-- Project file: `default.project.json`
-- Aftman: `aftman.toml` provides Rojo `7.7.0-rc4` and Selene `0.27.1`. Run `aftman install` if not already done.
-- Rojo serve: `rojo serve default.project.json`
-- Lint: `selene src/`
-- Build for Studio: `rojo build default.project.json -o build.rbxl`
+1. Player spawns at **Lodge** (`PhishLodgeSpawn` tag → SpawnLocation)
+2. Walks to dock (cast zone via `PhishCastZone` tag) OR enters rowboat (`PhishBoatHull` + `PhishBoatSeat`)
+3. Player presses cast → `RequestCast` → server picks fish from active water tile's spawn pool → `BiteOccurred`
+4. Player chooses verb in decision window
+5. If Reel → mini-game → `CatchResolved`
+6. Outcome → XP + journal entry + (Kindness only) aquarium offer
+7. Walks to sell-shop (`PhishShopTrigger` with `ShopType="Sell"`) → `RequestSellFish` → Pearls
+8. Walks to fisherman shop (`PhishShopTrigger` with `ShopType="Powerup"`) → `RequestPurchaseUpgrade` → unlocks gear
+9. Better rod tier (1→4) gates which `PhishWaterZone` Difficulty levels can spawn fish for them
 
-### Critical Rojo Convention
+---
 
-Every folder under `src/` already contains an `init.meta.json` with `{ "ignoreUnknownInstances": true }`. **Do not delete these.** They prevent Rojo from wiping Studio-built map content on sync. If you create a new subfolder under `src/`, create the same `init.meta.json` inside it.
+## Deliverables Checklist
 
-### Game Design Recap
+Build in dependency order. Smoke-test after each block.
 
-Two polished levels:
+### P1 — Code Archive Pass (do first)
+Buddy Bridge Lua under `src/` still wires up Stranger Danger and Backpack Checkpoint. Archive the SD-only files; keep BPC files for pattern reference.
 
-1. **Stranger Danger Park** — 6–8 NPCs in a park with randomized roles (safe-with-clue / safe-no-clue / risky) and randomized traits. Explorer inspects → traits revealed → Guide checks manual → Explorer talks. Goal: collect 3 clues to find a lost puppy.
-2. **Backpack Checkpoint** — TSA-style sorting. Items come down a conveyor; Explorer drops them in Pack It / Ask First / Leave It bins based on the Guide's chart.
+- [ ] Create `src/_archive/` (note the underscore — keeps it sorted last; outside Rojo project mapping so it's harmless). Add a one-line README explaining the move.
+- [ ] **Confirm `src/_archive/` is NOT mapped in `default.project.json`.** If you put it under a mapped folder you must add an `init.meta.json` with `{"ignoreUnknownInstances": true}` to it.
+- [ ] Move these files (preserve relative path structure under `_archive/`):
+  - `ReplicatedStorage/Modules/StrangerDangerLogic.lua`
+  - `ReplicatedStorage/Modules/NpcRegistry.lua`
+  - `ServerScriptService/Services/Levels/StrangerDangerLevel.lua`
+  - `ServerScriptService/Services/Scenarios/StrangerDangerScenario.lua`
+  - `ServerScriptService/Services/GuideControlService.lua` (entirely Stranger-Danger-coupled)
+  - `StarterPlayerScripts/Explorer/NpcDescriptionCardController.client.lua`
+  - `StarterPlayerScripts/Explorer/StrangerDangerFxController.client.lua`
+  - `StarterPlayerScripts/Explorer/NpcBarkController.client.lua` (if it has no PHISH! relevance)
+  - `StarterPlayerScripts/Guide/GuideAnnotationController.client.lua`
+  - `StarterPlayerScripts/Guide/Manuals/StrangerDangerManual.lua`
+  - `StarterPlayerScripts/Guide/Manuals/StrangerDangerBookContent.lua`
+  - `StarterPlayerScripts/Guide/GuideBoothController.client.lua` (BB-only)
+  - `StarterPlayerScripts/Guide/GuideNotesController.client.lua` (BB-only)
+- [ ] **Keep BPC files** for now — `BeltController.lua`, `WaveDirector.lua`, `MiniBossDirector.lua`, `GuideRehydrate.lua`, `BackpackCheckpointLevel.lua`, `BackpackCheckpointScenario.lua`, `BackpackCheckpointManual.lua`, `ScannerService.lua`, `ScannerGuideHud.client.lua`. You'll repurpose patterns from them in P2.
+- [ ] Disconnect Stranger Danger registrations in `ServerBootstrap.server.lua` and any client bootstrap. Comment out (don't delete) the `LevelService` BPC/SD wiring — you'll replace with PHISH! wiring in P2.
+- [ ] Run `rojo build default.project.json -o build.rbxl` and `selene src/` — both must pass before moving on.
 
-Players: 8/server, duos of 2, up to 4 simultaneous duos. Each duo plays in its own instanced slot. The round plays both levels back-to-back inside one slot, linked by a `BuddyPortal`.
+### P2 — PHISH! Core Systems
 
-### Architecture Recap (read the docs for details)
+#### Data + Shared
+- [ ] `ReplicatedStorage/Modules/FishRegistry.lua` — author all 12 MVP fish per `docs/PHISH_CONTENT.md`. Data-driven; no logic, just a record per fish.
+- [ ] `ReplicatedStorage/Modules/FishCategoryTypes.lua` — enum: `ScamBait`, `Rumor`, `ModImposter`, `Kindness`
+- [ ] `ReplicatedStorage/Modules/ReelActionTypes.lua` — enum: `Cast`, `Wait`, `Verify`, `Reel`, `CutLine`, `Report`, `Release`
+- [ ] `ReplicatedStorage/Modules/RarityTypes.lua` — enum: `Common`, `Rare`, `Epic`, `Legendary`
+- [ ] `ReplicatedStorage/Modules/WaterDifficultyTypes.lua` — enum: `Beginner`, `Intermediate`, `Expert`, `Legendary`
+- [ ] `ReplicatedStorage/Modules/PowerupCatalog.lua` — rod tiers + lures + sonar (data-driven; see Economy below)
+- [ ] `ReplicatedStorage/Shared/PondState.lua` — server-side per-player state machine (Idle, Casting, Waiting, BitePending, Verifying, Reeling, Resolving)
+- [ ] `ReplicatedStorage/Shared/FishEncounterTypes.lua` — payload shapes
+- [ ] Extend `ReplicatedStorage/RemoteService.lua` with all remotes from §RemoteService Additions below
 
-- **Server-authoritative.** Server owns roles, round state, scoring, NPC role assignments, item correctness, rewards.
-- **Lobby** is shared. Players pair via capsule pads (`LobbyCapsule` tag, `CapsuleId` + `CapsulePairId` attributes) OR via `ProximityPrompt` "invite to play" on other players.
-- **Play arena slots** are pre-built in `Workspace/PlayArenaSlots` (4 slots, each tagged `PlayArenaSlot`).
-- **Level templates** live in `ServerStorage/Levels`. Clone into a slot's `PlayArea` folder when a round starts.
-- **NPC templates** live in `ServerStorage/NpcTemplates`. `ScenarioService` picks one per spawn point at level start, applies traits and role.
-- **Item templates** live in `ServerStorage/ItemTemplates`. `ScenarioService` picks the rotation for Backpack Checkpoint.
-- **Booth template** lives in `ServerStorage/GuideBooths/DefaultBooth`. Clone into a slot's `Booth` folder, align to `BoothAnchor`.
-- **Guide is teleported into the booth** and cannot leave during the round.
-- **Remotes** are all created in `RemoteService.lua` (single source of truth). See `docs/TECHNICAL_DESIGN.md` for the full list.
+#### Server services (`ServerScriptService/Services/`)
+- [ ] `PondService` — owns active water-tile spawn pools; reads `PhishWaterZone` tags + attributes via CollectionService; gates spawns by `MinRodTier`
+- [ ] `CastingService` — handles `RequestCast`; validates rod tier vs target tile difficulty; spawns lure visual at `workspace.PhishMap.PhishDock.CastAnchor` or boat hull
+- [ ] `BiteService` — picks fish weighted-random from pond pool, schedules `BiteOccurred` after randomized 2–6 sec wait, owns the bobber category-cue payload
+- [ ] `CatchResolutionService` — server-authoritative validation of verb-vs-fish; grants XP, journal unlock, optional aquarium offer
+- [ ] `FieldGuideService` — manages per-player Field Guide unlocks; exposes `RequestVerify`
+- [ ] `JournalService` — per-player caught-fish journal
+- [ ] `AquariumService` — places Kindness fish models in `PhishAquariumDisplay` volume; manages slot capacity (4–6 fish)
+- [ ] `EconomyService` — Pearls currency, sell prices, purchase validation
+- [ ] `BoatService` — hovercraft physics: VectorForce + AlignOrientation on boat Hull; reads driver input via `PhishBoatSeat` `IsDriver=true` seat; clamps to water-grid bounds
+- [ ] `ShopService` — handles `RequestPurchaseUpgrade` and `RequestSellFish`; reads `PhishShopTrigger` ShopType
+- [ ] Update `ServerBootstrap.server.lua` — wire all new services in startup order
+- [ ] Extend existing `ScoringService`, `RewardService`, `DataService` (or replace if BB shape doesn't fit)
 
-### Implementation Order
+#### Client controllers (`StarterPlayerScripts/`)
+- [ ] `Angler/AnglerController.client.lua` — main rod input loop, decision window UI (4 verb buttons)
+- [ ] `Angler/CastingController.client.lua` — cast charge bar, lure visual
+- [ ] `Angler/ReelMinigameController.client.lua` — repurpose BeltController timing pattern (do not fork the file; build new module that uses the pattern)
+- [ ] `Angler/BoatDriverController.client.lua` — handles WASD input when seated as driver, sends to BoatService
+- [ ] `UI/FieldGuideController.client.lua` — repurpose `BookView.lua` pattern; one page per fish entry
+- [ ] `UI/JournalController.client.lua` — list of caught fish, opens to Field Guide page on click
+- [ ] `UI/AquariumViewController.client.lua` — third-person camera framing of aquarium volume on prompt
+- [ ] `UI/PowerupShopController.client.lua` — opens on `PhishShopTrigger ShopType=Powerup` proximity prompt; lists rods/lures/sonar with prices; uses `UIStyle.lua` Cartoon font; warm cozy palette to match map aesthetic
+- [ ] `UI/SellShopController.client.lua` — opens on `ShopType=Sell` prompt; lists current inventory of caught fish with sell prices; sell-individual + sell-all
+- [ ] `UI/HudController.client.lua` — Pearls counter, current rod tier, current XP, decision-window timer
+- [ ] `UI/NotificationController.client.lua` — toast for XP grants, journal unlocks, lesson lines
+- [ ] `ClientBootstrap.client.lua` — wire all new controllers
 
-Work in this order. Update `tasks/todo.md` as you go.
+### P3 — Content + Polish
+- [ ] Final lesson-line copy on all 12 fish (test by reading aloud as if to a 9-year-old)
+- [ ] SFX hooks: cast, splash, bite (4 category variants), reel-success, sad-trombone, shop-buy, shop-sell, boat-engine
+- [ ] Field Guide page styling (warm parchment background)
+- [ ] Tutorial nudge on first cast (one-time)
+- [ ] Pre-populated demo profile so a fresh spawn already has 1 Compliment Carp in the aquarium for the demo
+- [ ] Append demo script (90 sec) to `docs/PHISH_MVP_PLAN.md` if missing details
+- [ ] Sweep `tasks/lessons.md` and add anything you learned
 
-#### Milestone 1: Skeleton
+### P4 — Stretch (only if MVP locks early)
+- [ ] 6 stretch fish from `docs/PHISH_CONTENT.md`
+- [ ] Boss Phisher Legendary encounter
+- [ ] DataStore persistence for Pearls + journal + aquarium
+- [ ] Buddy Mode (second player coaches via Field Guide UI)
+- [ ] Sonar powerup that reveals fish category before bite
 
-1. `RemoteService.lua` — creates and exposes all RemoteEvents / RemoteFunctions.
-2. `Modules/Constants.lua`, `Modules/RoleTypes.lua`, `Modules/LevelTypes.lua`.
-3. `Modules/PlayAreaConfig.lua`, `Modules/NpcRegistry.lua`, `Modules/ItemRegistry.lua`.
-4. `ServerBootstrap.server.lua` — requires every server service in dependency order.
-5. `ClientBootstrap.client.lua` — requires every client controller.
+---
 
-After this, `rojo serve` should succeed and the place should run with no errors.
+## RemoteService Additions
 
-#### Milestone 2: Lobby + Pairing
+Declare all remotes in `RemoteService.lua` with comments explaining purpose. Server-validate every payload. Rate-limit every player-triggered remote (use existing `RateLimiter.lua`).
 
-1. `LobbyService.lua` — capsule occupancy tracking via `LobbyCapsule`-tagged parts and `Touched` events. Pair-ready broadcast when both pads of a `CapsulePairId` are occupied. Invite flow via proximity prompt on other players.
-2. `MatchService.lua` — `CreatePair`, `GetPair`, `RemovePair`.
-3. Client: `LobbyPairController.client.lua` — listens for `CapsulePairReady` / `InviteReceived`, shows confirm UI, sends responses.
-4. Test: 2 players in Studio can pair via capsule and via proximity prompt.
+| Remote | Direction | Payload | Purpose |
+|--------|-----------|---------|---------|
+| `RequestCast` | C→S | `{aimDirection, chargePower, sourceWaterTile}` | Player throws lure |
+| `BiteOccurred` | S→C | `{encounterId, bobberCue, rippleCue, decisionWindowSec}` | Notify of bite |
+| `RequestVerify` | C→S | `{encounterId}` | Open Field Guide for encounter |
+| `FieldGuideEntryUnlocked` | S→C | `{fishId, entryText}` | Reveal/unlock entry |
+| `RequestReel` | C→S | `{encounterId}` | Commit to reel |
+| `RequestCutLine` | C→S | `{encounterId}` | Refuse catch |
+| `RequestReport` | C→S | `{encounterId}` | Report imposter |
+| `CatchResolved` | S→C | `{fishId, category, rarity, xpDelta, lessonLine, wasCorrect, addedToInventory}` | Final result |
+| `JournalUpdated` | S→C | `{fishId}` | Add to journal |
+| `RequestPlaceFishInAquarium` | C→S | `{fishId}` | Display in aquarium |
+| `AquariumUpdated` | S→C | `{fishId, slot}` | Aquarium changed |
+| `XpGranted` | S→C | `{amount, total}` | XP UI update |
+| `PearlsGranted` | S→C | `{amount, total}` | Currency UI update |
+| `RequestSellFish` | C→S | `{fishId, quantity}` | Sell from inventory |
+| `RequestPurchaseUpgrade` | C→S | `{powerupId}` | Buy powerup |
+| `InventoryUpdated` | S→C | `{inventory}` | Caught-fish inventory changed |
+| `PowerupUnlocked` | S→C | `{powerupId, currentRodTier}` | Powerup grant |
+| `RequestEnterShop` | C→S | `{shopType}` | Open shop UI (server validates proximity) |
+| `RequestBoatThrottle` | C→S | `{throttle, steer}` | Boat driver input |
+| `BoatStateUpdated` | S→C | `{position, velocity}` | Optional, for passenger UI |
+| `Notify` | S→C | `{message, severity}` | Generic toast |
 
-#### Milestone 3: Role + Round Start
+---
 
-1. `RoleService.lua` — `AssignRoles`, `GetRole`. Auto-assign on timeout.
-2. `RoundService.lua` — `StartRound`, `EndRound`, timer, level sequence (`{"StrangerDangerPark", "BackpackCheckpoint"}`).
-3. `PlayAreaService.lua` — slot reservation, clone level templates, clone booth, align via `BoothAnchor`, teleport players, lock booth (invisible wall + return-on-exit).
-4. `LevelService.lua` — start / complete / cleanup the active level. Handle the `BuddyPortal` between levels.
-5. Client: `RoleSelectController.client.lua`, `RoundHudController.client.lua`.
-6. Test: paired duo can pick roles and get teleported to a slot. Explorer in level entry, Guide in booth, booth sealed.
+## Economy Spec (you implement; user said "you figure it out")
 
-#### Milestone 4: Stranger Danger Park (the headline level)
+### Currency
+- **Pearls** — single currency, server-authoritative
 
-This is the most important level. Spend more time here than anywhere else.
+### Rod Tiers (Powerup Shop catalog)
 
-1. `ScenarioService.lua` — `GenerateStrangerDangerScenario(slot)`:
-    - Pick which 3 of 6–8 NPC spawn points get `SafeWithClue` role.
-    - Pick 2 spawns for `SafeNoClue`, 2–3 for `Risky`.
-    - For each NPC, draw 1–3 traits from the appropriate pool in `NpcRegistry` (risky NPCs draw from risky tags + maybe one neutral; safe NPCs draw from safe tags).
-    - Pick a `PuppySpawn`. Distribute clue fragments such that the 3 safe-with-clue NPCs reveal hints leading to it.
-    - Construct the `GuideManual` payload (full risky / safe trait reference list).
-2. `LevelService` integrates the scenario:
-    - For each `BuddyNpcSpawn` part, clone an NPC template into it (random visual).
-    - Set the NPC's `BillboardGui.TraitCard` text via attribute (or via remote at inspect time — your call).
-    - Add `ProximityPrompt` to each NPC for "Take a closer look" → fires `RequestInspectNpc`.
-3. `ExplorerInteractionService.lua`:
-    - `RequestInspectNpc` — validate proximity and active level. Send `NpcDescriptionShown` to Explorer (full trait list as visible to Explorer) and to Guide (with risk cross-reference).
-    - `RequestTalkToNpc` — second prompt that appears after inspect. Apply outcome:
-        - Safe with clue → fire `ClueCollected` + add trust points.
-        - Safe no clue → friendly small talk notification, no penalty.
-        - Risky → consequence (teleport Explorer to level entry / brief slowdown / play funny SFX), `ScoringService:AddMistake`.
-4. `GuideControlService.lua`:
-    - `RequestAnnotateNpc(npcId, marker)` — validate Guide role, broadcast `NpcAnnotationUpdated` to the duo so the Explorer's HUD can draw a colored ring around that NPC.
-5. Client controllers:
-    - `ExplorerController.client.lua` — proximity-prompt routing, talk confirmations.
-    - `NpcDescriptionCardController.client.lua` — render the small trait card UI for the Explorer.
-    - `GuideController.client.lua` — top-level routing on Guide side.
-    - `GuideManualController.client.lua` — render the full manual on the booth's `ControlPanel` SurfaceGui. Highlight matching trait rows when the Guide sees a description.
-    - `GuideAnnotationController.client.lua` — annotation buttons (✅/🚩/⚠️/Clear) targeting the most recently inspected NPC.
-6. World feedback:
-    - When the 3rd clue is collected, spawn a sparkle trail toward the puppy.
-    - Activate `LevelExit` near the chosen `PuppySpawn`.
-7. Test the full slice end-to-end with 2 players.
+| RodId | Tier | Display | Price (Pearls) | Unlocks Difficulty |
+|-------|------|---------|---------------|---------------------|
+| `rod_wooden` | 1 | Wooden Rod | 0 (starter) | Beginner |
+| `rod_iron` | 2 | Iron Rod | 50 | + Intermediate |
+| `rod_crystal` | 3 | Crystal Rod | 200 | + Expert |
+| `rod_lighthouse` | 4 | Lighthouse Rod | 800 | + Legendary |
 
-#### Milestone 5: Backpack Checkpoint
+### Other Powerups
 
-1. `ScenarioService:GenerateBackpackCheckpointScenario(slot)`:
-    - Pick N items (default 6) from `ItemRegistry` with a balance across lanes.
-    - Build the sequence and the `GuideManual` payload (full chart).
-2. Conveyor logic in `LevelService` (or a small helper module):
-    - Spawn item template at `BeltStart`.
-    - Tween / move it toward `BeltEnd` (or just spawn at the Explorer's reach — keep it simple for MVP).
-    - Wait for either pickup or auto-advance after a timeout.
-3. `ExplorerInteractionService`:
-    - `RequestPickupItem(itemId)` — validate it's the active item. Mark it as held by the Explorer.
-    - `RequestPlaceItemInLane(itemId, laneId)` — validate, fire `ItemSortResult`. Correct → trust points + advance. Wrong → bounce-back animation, mistake counter.
-4. `GuideControlService`:
-    - `RequestAnnotateItem(itemId, lane)` — broadcast annotation.
-5. Client:
-    - Extend `ExplorerController` for pickup / drop input. Use ProximityPrompts on bins.
-    - Extend `GuideManualController` to render the chart for this level.
-    - Extend `GuideAnnotationController` for item-mode annotation buttons.
-6. After N items, fire `LevelExit` and route through `RoundFinishZone` → score screen.
+| PowerupId | Display | Price | Effect |
+|-----------|---------|-------|--------|
+| `lure_verifier` | Verifier Lens | 30 | Verify takes 1.5 sec instead of 3 sec |
+| `lure_patience` | Patience Charm | 40 | Decision window extended by 50% |
+| `sonar_basic` | Basic Sonar | 100 | Reveals true category 30% of bites |
+| `sonar_advanced` | Advanced Sonar | 300 | Reveals true category 80% of bites (post-MVP) |
+| `boat_tune` | Boat Engine Tune | 80 | Boat 50% faster |
 
-#### Milestone 6: Scoring + Score Screen
+### Sell Prices (Sell Shop)
 
-1. `Modules/ScoringConfig.lua` — point values for level completion, time bonus, mistake penalty, trust streak.
-2. `ScoringService.lua` — track time / mistakes / trust points / rank.
-3. `RewardService.lua` — grant Trust Seeds (session data is fine for MVP).
-4. Client: `ScoreScreenController.client.lua` — show breakdown + replay / return-to-lobby buttons.
+Reward correct verbs; make wrong-verb catches near-worthless. Tension: kid wants money, kid catches a Kindness fish, do they sell it (small money) or aquarium it (no money but completion)?
 
-#### Milestone 7: Lobby Progression
+| Fish handling result | Pearls per fish |
+|----------------------|-----------------|
+| Kindness Common, correct verb | 5 |
+| Kindness Rare, correct verb | 25 |
+| Kindness Epic, correct verb | 100 |
+| Kindness Legendary, correct verb | 500 |
+| Scam/Rumor/ModImposter, correct verb (refused) | 0 — you didn't catch anything to sell |
+| ANY fish, wrong verb | 1 (junk fish — symbolic; tells player "this wasn't valuable") |
 
-1. `DataService.lua` — session-only data.
-2. Client: `LobbyProgressionController.client.lua` — visualize Trust Seeds + treehouse level on the lobby's treehouse area (toggle visibility on placeholder visual stages User 1 placed).
+### XP Rewards (separate from Pearls)
 
-#### Milestone 8: Polish
+XP doesn't buy anything in MVP — it's just a progress counter for the demo's "feels like progression" beat. Keep XP grants small (5–50 per catch) so the bar visibly fills during a 90-sec demo.
 
-- SFX hookups (User 1 placed Sounds in `SoundService` — wire each to the right server/client event).
-- UI styling pass: Cartoon font, rounded corners, friendly colors. Use `Modules/UIStyle.lua` as the single source of truth.
-- 2-line tutorial prompts on first-ever pair / first-ever role select.
-- Replay flow that returns the duo to the lobby cleanly and re-enables their capsules.
-- Test the demo route end-to-end. Time it. Should be under 5 minutes.
+---
 
-### Verification Before Marking Anything Done
+## Boat Physics Spec (hovercraft, simple)
 
-After every milestone:
+The map's water has CanCollide off, so the boat won't naturally float. Implement hover via constraints:
 
-- [ ] `selene src/` passes (or you've documented known-acceptable warnings).
-- [ ] No file in `src/` exceeds 500 lines.
-- [ ] All remote handlers validate: player exists, is in active round, has correct role, target id exists.
-- [ ] No client-side authoritative state for score / role / NPC role / item correctness.
-- [ ] Tested with 2 players in a Studio local server (or 1-player + `DEBUG_SOLO` flag in `Constants.lua` if alone).
-- [ ] `tasks/todo.md` updated.
-- [ ] If you got something wrong and the user corrected you, `tasks/lessons.md` updated.
+- **VectorForce** on Hull pointing +Y, magnitude `Hull.AssemblyMass * workspace.Gravity` plus a small bouyancy nudge (10%); applied in world space; `RelativeTo = "World"`
+- **AlignOrientation** on Hull, target orientation = `CFrame.Angles(0, currentHeading, 0)` — keeps boat upright; updates from driver input
+- **LinearVelocity** for forward thrust based on driver's WASD throttle (clamp ~30 studs/sec base, 45 with `boat_tune`)
+- Server is authoritative on the Hull's CFrame. Driver client sends throttle/steer via `RequestBoatThrottle`; server applies forces.
+- Clamp position to within the water grid bounds (`workspace.PhishMap.PhishWater` BoundingBox) — bounce off invisible walls if player tries to drive off the map
+- Passengers `:Sit()` into Seats; the Welds Roblox creates handle them riding along
 
-### Coordination With User 1
+---
 
-- The map (lobby, slots, level templates, NPC/item templates, booth template) comes from User 1's Studio work. **Do not edit it directly** — only consume the tags and attributes they set.
-- If a tag / attribute / Model name is missing or wrong, update `docs/TECHNICAL_DESIGN.md` and `human_todo.md` to reflect what you actually need, then tell User 1.
-- Test `rojo serve` early to confirm the place file isn't getting wiped (the `init.meta.json` files prevent this — if it happens, check they are still present in every `src/` subfolder).
+## Shared Contract (User 1 builds the world; you read it)
 
-### When You Are Done
+**This is the only sync point with User 1.** Read tags via `CollectionService:GetTagged(...)`. Read attributes via `:GetAttribute(...)`. Reference named anchors by exact path.
 
-1. Verify every checkbox in `tasks/todo.md`.
-2. Run `selene src/` one final time.
-3. Run a clean 2-player Studio test of the full demo route: pair → roles → Stranger Danger Park → Backpack Checkpoint → score screen → return to lobby → progression visual updates.
-4. Make sure the demo flow described in `docs/MVP_SCOPE.md` "Hackathon Demo Script" works end-to-end without intervention.
+### Tags You Will Read
+
+| Tag | Where User 1 puts it | Required attributes |
+|-----|----------------------|---------------------|
+| `PhishLodgeSpawn` | SpawnLocation Part | — |
+| `PhishCastZone` | Dock Parts | — |
+| `PhishWaterZone` | Each 16×16 water tile | `Difficulty` (string), `MinRodTier` (number) |
+| `PhishFishTemplate` | Each fish Model in `ServerStorage.PhishFishTemplates` | `FishId` (string) |
+| `PhishAquariumDisplay` | Aquarium volume in Lodge | — |
+| `PhishShopTrigger` | Shop proximity volume | `ShopType` ("Powerup" or "Sell") |
+| `PhishBoatHull` | Boat PrimaryPart | — |
+| `PhishBoatSeat` | Each boat seat | `IsDriver` (boolean) |
+
+### Named Paths You Can Reference
+
+| Path | What |
+|------|------|
+| `workspace.PhishMap.PhishLodge.AquariumOrigin` | Aquarium fish spawn anchor |
+| `workspace.PhishMap.PhishDock.CastAnchor` | Cast lure spawn anchor |
+| `workspace.PhishMap.PhishBoat` | Boat Model parent (PrimaryPart is `Hull`) |
+| `ServerStorage.PhishFishTemplates` | All fish models |
+| `ServerStorage.PhishBobbers` | All bobber visual variants |
+| `ServerStorage.PhishLures` | Lure visuals |
+
+**Resolution order on game start:**
+1. `task.wait()` for one frame, then check `CollectionService:GetTagged("PhishLodgeSpawn")` returns ≥ 1 instance
+2. If empty after 5 sec, log a warning ("User 1's map not loaded yet?") and gracefully wait
+3. Never assume an instance exists by path without checking — User 1 may not have built it yet
+
+If a tag/attribute name needs to change: **Discord User 1 first.** Don't change it unilaterally and don't just rename their tag — they'll have placed dozens of instances with it.
+
+---
+
+## File Ownership Rules (no merge conflicts)
+
+| Path | You? | User 1? |
+|------|------|---------|
+| `src/**/*.lua` | ✅ own | ❌ never edit |
+| `default.project.json`, `selene.toml`, `aftman.toml` | ✅ own | ❌ |
+| `init.meta.json` files in `src/` | ✅ own (preserve all existing; add for new subfolders) | ❌ never delete |
+| Roblox place file (Studio assets) | ❌ don't edit Studio | ✅ owns |
+| `human_todo.md` | ❌ | ✅ owns (Studio tasks) |
+| `tasks/user2_code.md` (your task list — create if missing) | ✅ owns | ❌ |
+| `tasks/user1_map.md` | ❌ | ✅ owns |
+| `tasks/todo.md` (top-level pointer) | read-only | read-only |
+| `tasks/lessons.md` | append-only at end (coordinate via Discord) | append-only at end |
+| `CLAUDE.md`, `docs/PHISH_*.md`, `docs/GAMEDESIGN.md` | ❌ locked — ping team if wrong | ❌ locked |
+| `prompts/user2_scripting_prompt.md` (this file) | ❌ | ❌ |
+
+**When in doubt: don't touch what User 1 owns. Discord them.**
+
+---
+
+## Workflow
+
+1. **Plan first.** Enter plan mode for any non-trivial block. Write your plan to `tasks/user2_code.md` with checkable items. For each P2 system, sketch the remote payloads + server state transitions before writing code.
+2. **Server authority always.** Never trust a client value for: catch identity, verb correctness, XP grants, Pearls grants, journal unlocks, aquarium contents, current rod tier, water-tile difficulty.
+3. **One service, one responsibility.** Don't put boat physics in `BiteService`. Don't let `EconomyService` decide which fish bit. Keep the seams clean.
+4. **Files under 500 lines.** Hard rule. Split if you approach. The two existing files near the limit (`BookView.lua` 472, `BeltController.lua` 466) must not get fatter when you repurpose patterns from them — build new modules instead.
+5. **Rojo + Selene clean before every commit.**
+   ```bash
+   rojo build default.project.json -o build.rbxl
+   selene src/
+   ```
+6. **`init.meta.json` rule.** Every `src/` subfolder mapped by Rojo must contain `{"ignoreUnknownInstances": true}` so Studio-built content (User 1's map) doesn't get wiped on sync. Never delete an existing one. Add one to any new mapped subfolder you create.
+7. **Smoke test after each P2 block.** A real solo Studio play session — even an ugly one — beats reasoning about correctness. Cast → bite → cut line → resolve. Then add Verify. Then add Reel. Then add Shop. Then Boat.
+8. **Discord-coordinate** when:
+   - You finish a service that depends on a new tag (so User 1 knows to apply it)
+   - You hit a missing instance (`PhishWaterZone` tags return empty) — ping User 1
+   - You want to change a tag name or add an attribute (User 1 must agree)
+   - You finish P2 (so User 1 can do final integration testing with you)
+9. **Lessons.** Append to `tasks/lessons.md` at the END of the file. Don't edit User 1's lesson entries. Things worth recording: Rojo gotchas, remote validation patterns, hovercraft tuning numbers, sonar drop rates that felt right.
+
+---
+
+## Acceptance Criteria
+
+You're done with MVP when, in a solo Studio play test:
+
+- [ ] `rojo build` succeeds; `selene src/` is clean; no file exceeds 500 lines
+- [ ] All P1 archive moves committed; no Stranger Danger code in active load path
+- [ ] Player spawns at `PhishLodgeSpawn`, sees aquarium with at least one Compliment Carp
+- [ ] Walks to dock cast zone, presses cast → lure spawns at `CastAnchor`
+- [ ] Bobber appears within 6 sec, decision window opens, 4 verb buttons render
+- [ ] Cut Line → resolves, no penalty, no inventory entry
+- [ ] Verify → Field Guide opens (using BookView pattern), shows fish entry, then resumes decision window
+- [ ] Reel on a Kindness fish → mini-game succeeds → outcome panel → "Place in aquarium?" prompt → fish appears in aquarium
+- [ ] Reel on a Scam fish → outcome panel with friendly buzzer + lesson line; junk fish in inventory worth 1 Pearl
+- [ ] Walks to sell-shop, opens UI, sells the junk fish, sees Pearls counter increment
+- [ ] Walks to fisherman shop, opens UI, buys Iron Rod (50 Pearls), rod tier ticks 1→2
+- [ ] Tries to cast at an Intermediate water tile with Tier 1 rod → blocked with friendly message; with Tier 2 rod → succeeds
+- [ ] Sits in boat driver seat → WASD moves boat → boat hovers over water tiles, can't leave grid bounds
+- [ ] Casts from boat → cast spawns from Hull, not dock CastAnchor
+- [ ] Journal opens (some HUD button), lists caught fish, click opens that fish's Field Guide page
+
+When all of these pass: commit and push, post in Discord "User 2 code MVP done", and sweep `tasks/lessons.md`.
+
+---
+
+## Out of Scope (do not build)
+
+- Roblox Studio map content (User 1)
+- Multiple maps / ponds / locations
+- Buddy Mode coordinator UI (post-MVP)
+- DataStore persistence (post-MVP — session-only is fine for demo)
+- Trading between players
+- Voice chat / chat moderation
+- Cosmetics shop (rod skins) — only the 4 functional rod tiers in MVP
+- Boss fish encounter
+- Daily quests / leaderboards
+- Anti-exploit beyond basic server validation
