@@ -26,14 +26,19 @@ local BOAT_SEAT_TAG = PhishConstants.Tags.BoatSeat
 local BOAT_MODEL_NAMES = { "PhishBoat", "Rowboat" }
 local HULL_PART_NAMES = { "Hull" }
 
-local SPEED = 32                -- studs/sec at full throttle
-local TURN_SPEED = 2.4          -- rad/sec at full steer
+local SPEED = 28                -- studs/sec at full throttle (W=forward)
+local REVERSE_SPEED = 14        -- studs/sec at full reverse (S)
+local TURN_SPEED = 1.4          -- rad/sec at full steer (A/D), ~80°/sec
+-- We sample the yaw angle once per boat and integrate from there. Storing
+-- it on the state (instead of re-extracting from the CFrame each frame)
+-- avoids any drift from ToEulerAnglesYXZ on a near-flat CFrame.
 
 type BoatState = {
 	model: Model,
 	hull: BasePart,
 	seat: VehicleSeat,
 	lockedY: number,            -- the Y the boat will never leave
+	yaw: number,                -- current heading in radians around world up
 }
 
 local boats: { [BasePart]: BoatState } = {}
@@ -174,43 +179,60 @@ local function setupBoat(hull: BasePart)
 	rigidify(hull, model)
 	if not model.PrimaryPart then model.PrimaryPart = hull end
 
+	-- Sample the spawn-pose yaw once. The boat's "forward" convention is
+	-- its RightVector, so derive yaw from it: R = (cos θ, _, -sin θ).
+	local rv = hull.CFrame.RightVector
+	local startYaw = math.atan2(-rv.Z, rv.X)
+
 	boats[hull] = {
 		model = model,
 		hull = hull,
 		seat = seat,
 		lockedY = hull.Position.Y,
+		yaw = startYaw,
 	}
-	print(("[PHISH] RowboatService: kinematic boat ready %s (lockedY=%.2f)"):format(hull:GetFullName(), hull.Position.Y))
+	print(("[PHISH] RowboatService: kinematic boat ready %s (lockedY=%.2f, yaw=%.2frad)"):format(hull:GetFullName(), hull.Position.Y, startYaw))
 end
 
 local function cleanupBoat(hull: BasePart)
 	boats[hull] = nil
 end
 
+-- Clamp a per-frame delta so a frame-rate spike can't teleport the boat.
+local function clamp(x: number, lo: number, hi: number): number
+	if x < lo then return lo end
+	if x > hi then return hi end
+	return x
+end
+
 local function tick(dt: number)
+	dt = clamp(dt, 0, 0.1)
 	for hull, state in pairs(boats) do
 		if not hull.Parent then continue end
 		local seat = state.seat
 		-- Only drive when an occupant is steering. An empty boat sits.
 		if not seat.Occupant then continue end
 
-		local throttle = seat.ThrottleFloat
-		local steer = seat.SteerFloat
+		local throttle = seat.ThrottleFloat   -- W = +1, S = -1
+		local steer = seat.SteerFloat         -- A = -1, D = +1
 		if throttle == 0 and steer == 0 then continue end
 
+		-- Integrate yaw from the boat's stored heading. We never re-derive
+		-- it from the CFrame each frame — that's what was making rotation
+		-- feel unstable / spin-y in the previous version.
+		state.yaw -= steer * TURN_SPEED * dt
+
+		-- Forward speed: full SPEED forward, half SPEED reverse so backing
+		-- up doesn't outrun the player.
+		local speed = if throttle >= 0 then SPEED else REVERSE_SPEED
+		local distance = throttle * speed * dt
+
+		-- Build a clean upright CFrame from yaw, then translate along the
+		-- boat's RightVector (its "forward" convention).
 		local pivot = state.model:GetPivot()
-		-- This boat's "forward" is its RightVector (matches the hull
-		-- orientation set up in Studio). Keep that convention.
-		local forward = pivot.RightVector
-		-- Strip any pitch/roll that crept in. We only ever rotate around Y.
-		local yaw = CFrame.Angles(0, -steer * TURN_SPEED * dt, 0)
-
-		local nextPos = pivot.Position + forward * (throttle * SPEED * dt)
-		nextPos = Vector3.new(nextPos.X, state.lockedY, nextPos.Z)
-
-		-- Rebuild a clean upright CFrame at the new position. Discards any
-		-- accidental tilt and locks Y to the spawn height.
-		local nextCFrame = CFrame.new(nextPos) * CFrame.fromEulerAnglesYXZ(0, math.atan2(-forward.X, -forward.Z), 0) * yaw
+		local pos = pivot.Position
+		local heading = CFrame.new(pos.X, state.lockedY, pos.Z) * CFrame.Angles(0, state.yaw, 0)
+		local nextCFrame = heading + heading.RightVector * distance
 
 		state.model:PivotTo(nextCFrame)
 	end
@@ -231,10 +253,13 @@ function RowboatService.Init()
 end
 
 -- Public API for MapIntegrityService.resetBoat to re-record the locked Y
--- after a teleport to spawn pose.
+-- and yaw after a teleport to spawn pose.
 function RowboatService.RelockY(hull: BasePart)
 	local state = boats[hull]
-	if state then state.lockedY = hull.Position.Y end
+	if not state then return end
+	state.lockedY = hull.Position.Y
+	local rv = hull.CFrame.RightVector
+	state.yaw = math.atan2(-rv.Z, rv.X)
 end
 
 return RowboatService
