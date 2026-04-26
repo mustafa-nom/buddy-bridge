@@ -244,9 +244,12 @@ end
 -- ---------------------------------------------------------------------------
 
 local SOUND_REPLACEMENTS: { [string]: string } = {
-	-- "Asset type does not match requested type" — replace.
-	["rbxassetid://9046491310"] = "rbxasset://sounds/impact_water.mp3",  -- water lapping
-	["rbxassetid://9114143000"] = "",                                     -- ambient wind/birds (silence)
+	-- "Asset type does not match requested type" — replace. Both ambient
+	-- loops get silenced because no built-in clip is long enough to loop
+	-- without a noticeable repeat (impact_water.mp3 is a 1s splash that
+	-- spams every 2s when looped).
+	["rbxassetid://9046491310"] = "",  -- water lapping (was a loud splash spam)
+	["rbxassetid://9114143000"] = "",  -- ambient wind/birds
 	["rbxassetid://3802267087"] = "rbxasset://sounds/electronicpingshort.wav",
 	["rbxassetid://1839997057"] = "rbxasset://sounds/impact_water.mp3",
 	["rbxassetid://5852457427"] = "rbxasset://sounds/swordlunge.wav",

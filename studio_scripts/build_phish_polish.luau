@@ -106,7 +106,9 @@ end
 
 local dock = map:FindFirstChild("PhishDock")
 local castAnchor = dock and dock:FindFirstChild("CastAnchor")
-if castAnchor then ambient(castAnchor, "WaterLapping", "rbxasset://sounds/impact_water.mp3", 0.35) end
+-- No good built-in ambient water loop (impact_water.mp3 is a 1s splash that
+-- spams when Looped). Skip until we have a real ambient track.
+if castAnchor then ambient(castAnchor, "WaterLapping", "", 0) end
 
 local centerAmbient = mkPart("AmbientCenter", polish, {
 	Size = V3(0.4, 0.4, 0.4), Transparency = 1, CanCollide = false, CFrame = CF(0, 6, 0),
