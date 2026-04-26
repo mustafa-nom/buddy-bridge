@@ -14,6 +14,7 @@ RemoteService.Events = {
 	"RequestRod",            -- player taps NPC ProximityPrompt to receive rod tool
 	"RequestCast",           -- player throws lure ({ aimPos = Vector3 })
 	"RequestReelTap",        -- player taps during reel mini-game
+	"SkillCheckComplete",    -- balance-the-line minigame finished ({ accuracy = 0..1 })
 	"SubmitDecision",        -- KEEP / CUT_BAIT ({ decision = "KEEP" | "CUT_BAIT", flags = { elementId } })
 	"RequestVerdict",        -- legacy verdict prompt compatibility
 	"RequestOpenPhishDex",   -- player opens dex screen
@@ -32,6 +33,7 @@ RemoteService.Events = {
 	"BiteOccurred",          -- bite has happened, start reel mini-game (payload: { tapsRequired, windowSeconds })
 	"ReelProgress",          -- per-tap progress update
 	"ReelFailed",            -- player ran out of taps / time, fish escaped
+	"BeginSkillCheck",       -- start balance-the-line minigame ({ duration, seed })
 	"ShowInspectionCard",    -- card data minus isLegit/species/redFlags (see DecisionService)
 	"DecisionResult",        -- decision outcome + species + flags + rewards
 	"VerdictPromptReady",    -- legacy verdict prompt compatibility

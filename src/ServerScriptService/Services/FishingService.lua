@@ -21,7 +21,10 @@ local SignalTracker = require(Helpers:WaitForChild("SignalTracker"))
 
 local TIER_NAMES = { "Beginner", "Intermediate", "Expert", "Legendary" }
 
-export type State = "Idle" | "Waiting" | "Biting" | "Reeling" | "Inspecting"
+export type State = "Idle" | "Waiting" | "Biting" | "Reeling" | "SkillCheck" | "Inspecting"
+
+local SKILL_CHECK_DURATION = 6.5             -- seconds the bar minigame runs
+local SKILL_CHECK_TIMEOUT = SKILL_CHECK_DURATION + 4   -- server fallback if client never replies
 
 local FishingService = {}
 
@@ -31,6 +34,9 @@ local timerThreadByPlayer: { [Player]: thread } = {}
 local waterDifficultyByPlayer: { [Player]: number } = {}
 local cashMultiplierByPlayer: { [Player]: number } = {}
 local sellBonusByPlayer: { [Player]: number } = {}
+local pendingCardByPlayer: { [Player]: any } = {}             -- card armed but waiting for skill check
+local skillCheckThreadByPlayer: { [Player]: thread } = {}
+local skillAccuracyByPlayer: { [Player]: number } = {}        -- last completed skill-check accuracy
 
 local function setState(player: Player, s: State)
 	stateByPlayer[player] = s
@@ -177,33 +183,91 @@ local function onReelTap(player: Player)
 	reelCountByPlayer[player] = n
 	RemoteService.FireClient(player, "ReelProgress", { count = n, required = PhishConstants.REEL_TAPS_REQUIRED })
 	if n >= PhishConstants.REEL_TAPS_REQUIRED then
-		setState(player, "Inspecting")
+		-- Reel finished. Hand off to the balance-the-line skill check; the
+		-- inspection card waits until SkillCheckComplete arrives (or the
+		-- server-side timeout fires).
+		setState(player, "SkillCheck")
 		local card = CardService.PickAndArm(player, waterDifficultyByPlayer[player])
-		RemoteService.FireClient(player, "ShowInspectionCard", CardService.ToPublic(card))
+		pendingCardByPlayer[player] = card
 		local t = timerThreadByPlayer[player]
 		if t then task.cancel(t); timerThreadByPlayer[player] = nil end
-		-- First-card nudge: teach the player what to look at.
-		if DataService.MarkTutorial(player, "FirstInspection") then
-			task.delay(0.6, function()
-				if not player.Parent then return end
-				RemoteService.FireClient(player, "TutorialNudge", {
-					title = "Read it like a real email",
-					text = "Check the sender's address AND the link's true URL — scams usually fake one but rarely both.",
-					durationSec = 7,
-				})
-			end)
-		end
+
+		RemoteService.FireClient(player, "BeginSkillCheck", {
+			duration = SKILL_CHECK_DURATION,
+			seed = math.random(1, 1_000_000),
+		})
+
+		-- Server-side timeout: if the client never replies, force-complete
+		-- so the player isn't softlocked.
+		local prev = skillCheckThreadByPlayer[player]
+		if prev then task.cancel(prev) end
+		skillCheckThreadByPlayer[player] = task.delay(SKILL_CHECK_TIMEOUT, function()
+			if FishingService.GetState(player) ~= "SkillCheck" then return end
+			FishingService.CompleteSkillCheck(player, 0)
+		end)
 	end
+end
+
+-- Fired by the client when the balance-the-line minigame finishes. Idempotent;
+-- the server-side timeout calls the same path with accuracy=0 if the client
+-- never replies.
+function FishingService.CompleteSkillCheck(player: Player, accuracy: number)
+	if FishingService.GetState(player) ~= "SkillCheck" then return end
+	local clamped = math.clamp(tonumber(accuracy) or 0, 0, 1)
+	skillAccuracyByPlayer[player] = clamped
+
+	local timeout = skillCheckThreadByPlayer[player]
+	if timeout then task.cancel(timeout); skillCheckThreadByPlayer[player] = nil end
+
+	local card = pendingCardByPlayer[player]
+	pendingCardByPlayer[player] = nil
+	if not card then
+		-- Edge case: card cleared somehow. Reset to idle.
+		FishingService.SetIdle(player)
+		return
+	end
+
+	setState(player, "Inspecting")
+	RemoteService.FireClient(player, "ShowInspectionCard", CardService.ToPublic(card))
+
+	-- First-card nudge: teach the player what to look at.
+	if DataService.MarkTutorial(player, "FirstInspection") then
+		task.delay(0.6, function()
+			if not player.Parent then return end
+			RemoteService.FireClient(player, "TutorialNudge", {
+				title = "Read it like a real email",
+				text = "Check the sender's address AND the link's true URL — scams usually fake one but rarely both.",
+				durationSec = 7,
+			})
+		end)
+	end
+end
+
+function FishingService.GetSkillCheckAccuracy(player: Player): number
+	return skillAccuracyByPlayer[player] or 0
 end
 
 function FishingService.Init()
 	RemoteService.OnServerEvent("RequestCast", onCast)
 	RemoteService.OnServerEvent("RequestReelTap", onReelTap)
+	RemoteService.OnServerEvent("SkillCheckComplete", function(player, payload)
+		local ok, _ = RemoteValidation.RunChain({
+			function() return RemoteValidation.RequirePlayer(player) end,
+			function() return RemoteValidation.RequireRateLimit(player, "SkillCheckComplete", 0.25) end,
+		})
+		if not ok then return end
+		local accuracy = (type(payload) == "table" and tonumber(payload.accuracy)) or 0
+		FishingService.CompleteSkillCheck(player, accuracy)
+	end)
 
 	Players.PlayerRemoving:Connect(function(player)
 		FishingService.SetIdle(player)
 		stateByPlayer[player] = nil
 		reelCountByPlayer[player] = nil
+		pendingCardByPlayer[player] = nil
+		skillAccuracyByPlayer[player] = nil
+		local sc = skillCheckThreadByPlayer[player]
+		if sc then task.cancel(sc); skillCheckThreadByPlayer[player] = nil end
 		SignalTracker.Cleanup(player)
 		CardService.Clear(player)
 	end)
