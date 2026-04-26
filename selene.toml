@@ -2,5 +2,9 @@ std = "roblox"
 
 # Inline `if X then Y end` is allowed throughout PHISH services for compact
 # guard clauses. Selene's default flags every one as `multiple_statements`.
+# `incorrect_standard_library_use` is allowed because the vendored
+# WindShake module uses `assert(value)` without a message string, which
+# is fine for a one-line type narrow but trips selene's strict default.
 [lints]
 multiple_statements = "allow"
+incorrect_standard_library_use = "allow"

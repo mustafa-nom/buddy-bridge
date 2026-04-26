@@ -26,4 +26,11 @@ end
 -- Touch the remote so it loads in the cache; controllers will reuse it.
 local _ = RemoteService
 
+-- WindShake: per-client foliage shake. Watches CollectionService for parts
+-- tagged "WindShake" and animates them via CFrame each Heartbeat. Client-
+-- side so it costs no network bandwidth. Tag pond reeds, palms, dock
+-- banners, etc. in Studio to bring them to life.
+local WindShake = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("WindShake"))
+WindShake:Init()
+
 print("[PHISH] Client bootstrap ready.")
