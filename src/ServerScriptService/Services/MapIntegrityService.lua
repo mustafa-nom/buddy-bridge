@@ -16,6 +16,7 @@ local MapIntegrityService = {}
 
 local WATER_TAG = PhishConstants.Tags.WaterZone
 local BOAT_HULL_TAG = PhishConstants.Tags.BoatHull
+local BOAT_SEAT_TAG = PhishConstants.Tags.BoatSeat
 
 -- ---------------------------------------------------------------------------
 -- 1. Keep water tiles non-collide.
@@ -38,6 +39,19 @@ local function makeAllWaterNonCollide()
 	end
 	if count > 0 then
 		print(("[PHISH] MapIntegrity: made %d water tile(s) non-collide."):format(count))
+	end
+end
+
+local function hideVehicleSeatHud(instance: Instance)
+	if not instance:IsA("VehicleSeat") then return end
+	pcall(function()
+		(instance :: any).HeadsUpDisplay = false
+	end)
+end
+
+local function hideAllVehicleSeatHuds()
+	for _, seat in ipairs(CollectionService:GetTagged(BOAT_SEAT_TAG)) do
+		hideVehicleSeatHud(seat)
 	end
 end
 
@@ -141,6 +155,8 @@ function MapIntegrityService.Init()
 	makeAllWaterNonCollide()
 	-- Catch any tile added later (e.g. live editing, deferred map gen).
 	CollectionService:GetInstanceAddedSignal(WATER_TAG):Connect(makeWaterNonCollide)
+	hideAllVehicleSeatHuds()
+	CollectionService:GetInstanceAddedSignal(BOAT_SEAT_TAG):Connect(hideVehicleSeatHud)
 
 	takeSnapshots()
 
