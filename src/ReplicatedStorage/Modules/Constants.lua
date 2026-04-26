@@ -1,98 +1,76 @@
 --!strict
--- Shared constants for both server and client.
+-- Shared PHISH! constants. Single source for tunables touched by both server and client.
 
 local Constants = {}
 
--- Solo testing: when true and IsStudio() and only one player, LobbyService
--- auto-pairs the lone player with a stub second slot, RoleService lets the
--- lone player toggle role with a key. Disable for the real demo.
-Constants.DEBUG_SOLO = false
-
--- Server capacity
+-- Server limits
 Constants.MAX_PLAYERS_PER_SERVER = 8
-Constants.MAX_DUOS_PER_SERVER = 4
-Constants.SLOT_COUNT = 4
 
--- Lobby
-Constants.INVITE_TTL_SECONDS = 15
-Constants.CAPSULE_CONFIRM_WINDOW_SECONDS = 5
-Constants.PROXIMITY_INVITE_RANGE = 12
+-- Folder name for the runtime-created remote folder.
+Constants.REMOTE_FOLDER_NAME = "PhishRemotes"
 
--- Role select
-Constants.ROLE_AUTOASSIGN_SECONDS = 12
+-- Client ScreenGui name.
+Constants.SCREEN_GUI_NAME = "PhishUI"
 
--- Round timing
-Constants.ROUND_DEFAULT_TIME_LIMIT = 300
-Constants.LEVEL_TIME_LIMIT_SECONDS = 240
+-- Cast / bite / decision timing (seconds)
+Constants.CAST_CHARGE_MIN = 0.2
+Constants.CAST_CHARGE_MAX = 1.6
+Constants.CAST_COOLDOWN_SECONDS = 0.6
+Constants.BITE_WAIT_MIN = 1.6
+Constants.BITE_WAIT_MAX = 3.8
+Constants.DECISION_WINDOW_SECONDS = 4.5
+Constants.VERIFY_PAUSE_SECONDS = 2.5
+Constants.REEL_MINIGAME_SECONDS = 4.0
+Constants.REEL_HIT_WINDOW = 0.18
 
--- Stranger Danger Park
-Constants.CLUES_TO_FIND = 3
-Constants.INSPECT_RADIUS_STUDS = 14
-Constants.TALK_RADIUS_STUDS = 10
-Constants.RISKY_TELEPORT_BACK_DISTANCE = 0
-Constants.RISKY_SLOWDOWN_SECONDS = 1.5
-Constants.STRANGER_DANGER_RISKY_COUNT = 3
-Constants.STRANGER_DANGER_ATTEMPTS = 3
-Constants.BOOTH_SUBMIT_RADIUS_STUDS = 10
+-- Underpowered-rod feedback cooldown so players don't get spammed.
+Constants.UNDERPOWERED_NUDGE_COOLDOWN = 6
 
--- Backpack Checkpoint — wave structure
--- 3 escalating waves per BACKPACK_CHECKPOINT_PRD_V1_POLISHED.md.
-Constants.BACKPACK_WAVE_COUNT = 3
-Constants.BACKPACK_ITEMS_PER_WAVE = { 6, 8, 10 }
-Constants.BACKPACK_BELT_SPEED_PER_WAVE = { 6, 8, 10 }   -- studs/sec; A5 placeholder
-Constants.BACKPACK_SCANS_PER_WAVE = { 9, 12, 15 }       -- addendum default: ceil(items*1.5)
-Constants.BACKPACK_FALLOFF_SECONDS = 12                 -- on-belt time before fall-off
-Constants.BACKPACK_BOUNCE_BACK_FRACTION = 0.25          -- bounce teleports item back by this fraction
-Constants.BACKPACK_PIXEL_POST_INTRO_SECONDS = 5         -- P0 non-gating intro slide
-Constants.BACKPACK_VETO_FREEZE_SECONDS = 3              -- Veto re-lock duration
-Constants.BACKPACK_INTRO_GATE_TIMEOUT_SECONDS = 30      -- max wait before Wave 1 force-starts (P2 gating)
-Constants.BACKPACK_MINI_BOSS_INNER_COUNT = 3            -- inner items per VIP bag
--- Legacy: kept so old call-sites don't crash if referenced during refactor.
-Constants.BACKPACK_ITEM_COUNT = 6 + 8 + 10
-Constants.BIN_RADIUS_STUDS = 10
-Constants.ITEM_PICKUP_RADIUS_STUDS = 10
-Constants.CONVEYOR_ITEM_TIMEOUT_SECONDS = 45
+-- Anti-spam on Cut Line.
+Constants.CUT_LINE_STREAK_NUDGE_AT = 4
 
--- Rate limit windows (seconds)
-Constants.RATE_LIMIT_INSPECT = 0.5
-Constants.RATE_LIMIT_TALK = 1.5
-Constants.RATE_LIMIT_ANNOTATE = 0.25
-Constants.RATE_LIMIT_BOOTH_SLOT = 0.25
-Constants.RATE_LIMIT_BOOTH_SUBMIT = 1.0
-Constants.RATE_LIMIT_PICKUP = 0.5
-Constants.RATE_LIMIT_PLACE = 0.5
-Constants.RATE_LIMIT_INVITE = 1.0
-Constants.RATE_LIMIT_SCAN = 0.5
-Constants.RATE_LIMIT_HIGHLIGHT = 0.25
-Constants.RATE_LIMIT_UNLOCK_LANE = 0.25
-Constants.RATE_LIMIT_DISMISS_INTRO = 0.5
-Constants.RATE_LIMIT_VETO = 1.0
+-- Rate limits (seconds between requests; player-keyed).
+Constants.RATE_LIMIT_CAST = 0.6
+Constants.RATE_LIMIT_DECISION = 0.25
+Constants.RATE_LIMIT_VERIFY = 0.5
+Constants.RATE_LIMIT_REEL_INPUT = 0.05
+Constants.RATE_LIMIT_PLACE_FISH = 0.5
+Constants.RATE_LIMIT_SHOP = 0.5
+Constants.RATE_LIMIT_SELL = 0.4
+Constants.RATE_LIMIT_BOAT_INPUT = 0.05
 
--- Score
-Constants.LEVEL_COMPLETION_BONUS = 500
-Constants.MAX_TIME_BONUS = 300
-Constants.MISTAKE_PENALTY = 50
-Constants.TRUST_POINTS_PER_CLUE = 100
-Constants.TRUST_POINTS_PER_CORRECT_SORT = 75
-Constants.TRUST_STREAK_BONUS = 25
-Constants.PERFECT_LEVEL_BONUS = 250
+-- Currency
+Constants.STARTING_PEARLS = 25
+Constants.SELL_RARITY_MULTIPLIER = {
+	Common = 1,
+	Rare = 2,
+	Epic = 4,
+	Legendary = 10,
+}
+Constants.SELL_BASE_PAYOUT = 5
 
--- Trust Seeds
-Constants.SEEDS_BASE_FINISH = 3
-Constants.SEEDS_BONUS_GOLD = 4
-Constants.SEEDS_BONUS_PERFECT = 6
-Constants.SEEDS_BONUS_PER_PERFECT_LEVEL = 1
+-- XP
+Constants.XP_TOAST_DURATION = 2
 
--- Map object names (these are the *expected* names; tags do the heavy lifting)
-Constants.STRANGER_DANGER_LEVEL_NAME = "StrangerDangerPark"
-Constants.BACKPACK_CHECKPOINT_LEVEL_NAME = "BackpackCheckpoint"
-Constants.DEFAULT_BOOTH_NAME = "DefaultBooth"
+-- Tags expected from User 1's map (see docs/INTEGRATION_CONTRACT_USER2.md).
+Constants.TAGS = {
+	CastZone = "PhishCastZone",
+	LodgeSpawn = "PhishLodgeSpawn",
+	Aquarium = "PhishAquariumDisplay",
+	ShopPrompt = "PhishShopPrompt",
+	SellPrompt = "PhishSellPrompt",
+	Rowboat = "PhishRowboat",
+	RowboatSeat = "PhishRowboatSeat",
+	FishTemplate = "PhishFishTemplate",
+}
 
--- Folder names within slots
-Constants.SLOT_PLAY_AREA_FOLDER = "PlayArea"
-Constants.SLOT_BOOTH_FOLDER = "Booth"
-
--- Folder names for remote registry
-Constants.REMOTE_FOLDER_NAME = "BuddyBridgeRemotes"
+Constants.ATTRS = {
+	ZoneTier = "ZoneTier",
+	ZoneId = "ZoneId",
+	FishId = "FishId",
+	BoatId = "BoatId",
+	BoatSpeed = "BoatSpeed",
+	BoatTurnRate = "BoatTurnRate",
+}
 
 return Constants
