@@ -432,11 +432,12 @@ local function MakeSlot(parent: Instance, initIndex: number?): GuiObject
 
 			-- PHISH PATCH: build a ViewportFrame icon from the tool's parts
 			-- when the tool has the Phish3DIcon attribute. Hides the static
-			-- ToolIcon so the 3D preview reads as the slot's icon.
+			-- ToolIcon AND the tool name label so the 3D preview reads as
+			-- the only thing in the slot — no text bleeding behind it.
 			local existingVp = SlotFrame:FindFirstChild("PhishVpIcon")
 			if tool:GetAttribute("Phish3DIcon") then
 				ToolIcon.ImageTransparency = 1
-				ToolName.Visible = true
+				ToolName.Visible = false
 				if existingVp then existingVp:Destroy() end
 				local vp = Instance.new("ViewportFrame")
 				vp.Name = "PhishVpIcon"
