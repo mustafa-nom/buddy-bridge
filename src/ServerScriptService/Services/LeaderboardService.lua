@@ -124,6 +124,13 @@ local function pushBoard()
 	RemoteService.FireAllClients("LeaderboardUpdated", { text = text, top = readTop() })
 end
 
+-- Public hook: force a board refresh now (e.g. after a high-value catch).
+-- Used by ScoringService.GrantCatchReward so the in-world SurfaceGui
+-- updates immediately, not on the next 30s tick.
+function LeaderboardService.Refresh()
+	pushBoard()
+end
+
 function LeaderboardService.Init()
 	-- Mirror every profile save into the ordered store so live ranks
 	-- update without waiting for the 30s loop.

@@ -179,6 +179,14 @@ RemoteService.OnClientEvent("ShowInspectionCard", function()
 	clearBar(false)
 end)
 
+-- The skill-check minigame takes over the bottom of the screen after the
+-- reel taps complete. Tear down "Fish on the line!" so the two panels
+-- don't stack and block each other.
+RemoteService.OnClientEvent("BeginSkillCheck", function()
+	active = false
+	clearBar(false)
+end)
+
 -- Accessibility: same action as the green button (only while reel is active)
 UserInputService.InputBegan:Connect(function(input, gpe)
 	if gpe or not active then return end

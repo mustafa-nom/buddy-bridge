@@ -7,6 +7,7 @@ local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 
 local Services = script.Parent
 local DataService = require(Services:WaitForChild("DataService"))
+local LeaderboardService = require(Services:WaitForChild("LeaderboardService"))
 
 local ScoringService = {}
 local debugCoinCooldownByPlayer: { [Player]: number } = {}
@@ -57,6 +58,9 @@ function ScoringService.GrantCatchReward(player: Player, wasCorrect: boolean, ca
 	end
 
 	pushHud(player)
+	-- Update the Board of Fame immediately when someone catches a fish so
+	-- the in-world SurfaceGui doesn't lag the live state.
+	LeaderboardService.Refresh()
 	return { coinsDelta = coinsDelta, xpDelta = xpDelta, fishSellValue = fishSellValue }
 end
 
