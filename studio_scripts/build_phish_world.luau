@@ -281,52 +281,14 @@ end
 -- ============================================================
 -- BLOCK 5 — Water tile grid (12x12, concentric difficulty rings)
 -- ============================================================
+-- Water grid lives in studio_scripts/build_phish_water.luau (50x50 biome
+-- variant). The world builder only stamps a placeholder folder so the
+-- contract's `Workspace.PhishMap.PhishWater` path exists immediately.
 local function buildWater(map)
 	local water = Instance.new("Folder")
 	water.Name = "PhishWater"
 	water.Parent = map
-
-	-- Collect every grid cell whose center sits outside the island radius.
-	local candidates = {}
-	for r = 0, 11 do
-		for c = 0, 11 do
-			local x = (c - 5.5) * 16
-			local z = (r - 5.5) * 16
-			local d = math.sqrt(x * x + z * z)
-			if d >= 38 then
-				table.insert(candidates, { r = r, c = c, x = x, z = z, d = d })
-			end
-		end
-	end
-	-- Sort ascending by distance from origin so closer tiles are easier.
-	table.sort(candidates, function(a, b) return a.d < b.d end)
-
-	-- Distribution per the contract: 70% Beginner, 20% Intermediate, 8% Expert, the rest Legendary (1–2 tiles).
-	local n = #candidates
-	local nB = math.floor(n * 0.70 + 0.5)
-	local nI = math.floor(n * 0.20 + 0.5)
-	local nE = math.floor(n * 0.08 + 0.5)
-
-	for i, t in ipairs(candidates) do
-		local tier
-		if i <= nB then tier = "Beginner"
-		elseif i <= nB + nI then tier = "Intermediate"
-		elseif i <= nB + nI + nE then tier = "Expert"
-		else tier = "Legendary" end
-
-		local tile = mkPart(string.format("Phish_WaterTile_%d_%d", t.r, t.c), water, {
-			Size = V3(16, 1, 16),
-			Color = TIER_COLORS[tier],
-			Material = Enum.Material.SmoothPlastic,
-			CFrame = CF(t.x, 0, t.z),
-			CanCollide = false,
-			Transparency = 0.15,
-		})
-		tag(tile, "PhishWaterZone")
-		attr(tile, "Difficulty", tier)
-		attr(tile, "MinRodTier", TIER_RODS[tier])
-	end
-	return water, n
+	return water, 0
 end
 
 -- ============================================================
