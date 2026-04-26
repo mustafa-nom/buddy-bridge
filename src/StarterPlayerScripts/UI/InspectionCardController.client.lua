@@ -8,14 +8,26 @@
 -- email is longer than the visible area.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 local UIStyle = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("UIStyle"))
 local UIBuilder = require(script.Parent:WaitForChild("UIBuilder"))
 
 local screen = UIBuilder.GetScreenGui()
+local guiParent = screen.Parent  -- PlayerGui — the card lives here, not in PhishUI
+
+-- Roblox's Backpack hotbar lives in CoreGui and renders above custom GUIs;
+-- on shorter screens its tool slots overlap the bottom of the inspection
+-- card and intercept clicks on KEEP / CUT BAIT. Hide it while the card is
+-- up and restore it when the decision result clears.
+local function setBackpackHidden(hidden: boolean)
+	pcall(function()
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, not hidden)
+	end)
+end
 
 local function clearOld()
-	local old = screen:FindFirstChild("PhishInspectionCard")
+	local old = guiParent and guiParent:FindFirstChild("PhishInspectionCard")
 	if old then old:Destroy() end
 end
 
@@ -39,6 +51,7 @@ local function renderCard(card: any)
 	cardGui.IgnoreGuiInset = true
 	cardGui.DisplayOrder = 50
 	cardGui.Parent = screen.Parent
+	setBackpackHidden(true)
 
 	local panel = UIStyle.MakePanel({
 		Name = "Panel",
@@ -210,7 +223,19 @@ end
 RemoteService.OnClientEvent("ShowInspectionCard", renderCard)
 
 -- When result lands, the result panel takes over; clear the card so the
--- screen isn't double-stacked.
+-- screen isn't double-stacked, and bring the rod hotbar back so the player
+-- can cast again.
 RemoteService.OnClientEvent("DecisionResult", function()
-	task.delay(0.2, clearOld)
+	task.delay(0.2, function()
+		clearOld()
+		setBackpackHidden(false)
+	end)
+end)
+
+-- Defensive: if the player respawns mid-inspection, restore the hotbar so
+-- they aren't stuck without a rod tray.
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+localPlayer.CharacterAdded:Connect(function()
+	setBackpackHidden(false)
 end)
