@@ -1,7 +1,9 @@
 --!strict
 -- Validates the player's chosen verb against the bitten fish's correctAction,
--- runs the (optional) reel mini-game, and resolves the catch. Grants
--- pearls/XP/journal/inventory deltas through DataService and RewardService.
+-- delegates the reel mini-game to ReelMinigameService, and resolves the
+-- catch with streak + lucky-bobber multipliers. Triggers public
+-- AnnouncementService broadcasts on Epic/Legendary catches and on streak
+-- milestones.
 
 local Players = game:GetService("Players")
 
@@ -10,6 +12,7 @@ local Modules = ReplicatedStorage:WaitForChild("Modules")
 local Constants = require(Modules:WaitForChild("Constants"))
 local FishRegistry = require(Modules:WaitForChild("FishRegistry"))
 local Actions = require(Modules:WaitForChild("ReelActionTypes"))
+local RodRegistry = require(Modules:WaitForChild("RodRegistry"))
 local FishEncounterTypes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("FishEncounterTypes"))
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 
@@ -20,12 +23,14 @@ local CastingService = require(Services:WaitForChild("CastingService"))
 local DataService = require(Services:WaitForChild("DataService"))
 local RewardService = require(Services:WaitForChild("RewardService"))
 local FieldGuideService = require(Services:WaitForChild("FieldGuideService"))
+local StreakService = require(Services:WaitForChild("StreakService"))
+local AnnouncementService = require(Services:WaitForChild("AnnouncementService"))
+local BobberService = require(Services:WaitForChild("BobberService"))
+local ReelMinigameService = require(Services:WaitForChild("ReelMinigameService"))
 
 local CatchResolutionService = {}
 
 local cutLineStreak: { [Player]: number } = {}
-local activeReelTokens: { [Player]: number } = {}
-local reelInputCount: { [Player]: number } = {}
 
 local function basicGate(player: Player, encounterId: string?, key: string, rateLimitWindow: number)
 	if typeof(encounterId) ~= "string" then return nil end
@@ -37,30 +42,71 @@ local function basicGate(player: Player, encounterId: string?, key: string, rate
 	return enc
 end
 
-local function finalizeCatch(player: Player, enc, wasCorrect: boolean, outcome: string)
+local function maybeUpdateTitle(player: Player)
+	local d = DataService.GetData(player)
+	local newTitle = d.Title
+	for _, entry in ipairs(Constants.TITLES) do
+		if d.TotalCorrectCatches >= entry.threshold then
+			newTitle = entry.title
+		end
+	end
+	if newTitle ~= d.Title then
+		d.Title = newTitle
+		RemoteService.FireClient(player, "TitleUnlocked", { Title = newTitle })
+	end
+end
+
+local function finalizeCatch(player: Player, enc, wasCorrect: boolean, outcome: string, reelQuality: number?)
 	local fish = enc.fishId and FishRegistry.GetById(enc.fishId)
 	if not fish then return end
 	enc.state = FishEncounterTypes.States.Resolved
 	enc.resolvedAt = os.clock()
 
+	local streak
+	if wasCorrect then
+		streak = StreakService.RegisterCorrect(player)
+	else
+		StreakService.RegisterWrong(player)
+		streak = 0
+	end
+
+	local streakMult = StreakService.MultiplierFor(streak)
+	local luckyMult = enc.luckyBobber and Constants.LUCKY_BOBBER_MULTIPLIER or 1
+
 	if wasCorrect then
 		DataService.AddFish(player, fish.id, fish.rarity)
 		DataService.UnlockJournal(player, fish.id)
 		FieldGuideService.UnlockEntry(player, fish.id)
+		maybeUpdateTitle(player)
 	end
-	local reward = RewardService.GrantCatch(player, fish.id, wasCorrect, enc.zoneTier)
+
+	local reward = RewardService.GrantCatch(player, fish.id, wasCorrect, enc.zoneTier, {
+		streakMultiplier = streakMult,
+		luckyMultiplier = luckyMult,
+		reelQuality = reelQuality,
+	})
 	local lessonLine = wasCorrect and fish.lessonLineCorrect or fish.lessonLineWrong
 
-	-- Cut-line streak nudge for spammers.
+	-- Cut-line streak nudge (separate from the multiplier streak — this one
+	-- watches for spam regardless of correctness).
 	if outcome == FishEncounterTypes.OutcomeKinds.CorrectCutLine then
 		cutLineStreak[player] = (cutLineStreak[player] or 0) + 1
 	elseif wasCorrect then
 		cutLineStreak[player] = 0
 	end
-	local streak = cutLineStreak[player] or 0
-	local nudge = streak >= Constants.CUT_LINE_STREAK_NUDGE_AT
+	local nudge = (cutLineStreak[player] or 0) >= Constants.CUT_LINE_STREAK_NUDGE_AT
 		and "Lots of cuts in a row — try Verify on the next bite to peek at the Field Guide."
 		or nil
+
+	-- Public hype.
+	if wasCorrect then
+		AnnouncementService.RareCatch(player, fish.displayName, fish.rarity)
+		if streak >= Constants.STREAK.PublicAnnounceAt and streak % Constants.STREAK.PublicAnnounceAt == 0 then
+			AnnouncementService.StreakMilestone(player, streak)
+		end
+	end
+
+	BobberService.Despawn(player)
 
 	RemoteService.FireClient(player, "CatchResolved", {
 		EncounterId = enc.encounterId,
@@ -73,7 +119,10 @@ local function finalizeCatch(player: Player, enc, wasCorrect: boolean, outcome: 
 		LessonLine = lessonLine,
 		Pearls = reward.Pearls,
 		Xp = reward.Xp,
+		Multipliers = reward.Multipliers,
 		AquariumPromptable = wasCorrect and fish.correctAction == Actions.Reel,
+		Streak = streak,
+		LuckyBobber = enc.luckyBobber == true,
 		Nudge = nudge,
 	})
 
@@ -87,11 +136,9 @@ local function handleVerify(player: Player, payload: any)
 	if enc.state ~= FishEncounterTypes.States.BitePending then return end
 	enc.state = FishEncounterTypes.States.Verifying
 	enc.verified = true
-	local fishId = enc.fishId
-	if fishId then
-		FieldGuideService.RevealEntry(player, fishId, true)
+	if enc.fishId then
+		FieldGuideService.RevealEntry(player, enc.fishId, true)
 	end
-	-- Resume bite-pending after pause.
 	task.delay(Constants.VERIFY_PAUSE_SECONDS, function()
 		local current = CastingService.GetEncounter(player)
 		if current ~= enc then return end
@@ -139,34 +186,26 @@ local function handleReel(player: Player, payload: any)
 	local enc = basicGate(player, payload.encounterId, "RequestReel", Constants.RATE_LIMIT_DECISION)
 	if not enc then return end
 	if enc.state ~= FishEncounterTypes.States.BitePending then return end
-
+	local fish = enc.fishId and FishRegistry.GetById(enc.fishId)
+	if not fish then return end
 	enc.state = FishEncounterTypes.States.Reeling
-	local token = (activeReelTokens[player] or 0) + 1
-	activeReelTokens[player] = token
-	reelInputCount[player] = 0
-	RemoteService.FireClient(player, "ReelMinigameStarted", {
-		EncounterId = enc.encounterId,
-		DurationSec = Constants.REEL_MINIGAME_SECONDS,
-		HitWindow = Constants.REEL_HIT_WINDOW,
-	})
 
-	task.delay(Constants.REEL_MINIGAME_SECONDS, function()
-		if activeReelTokens[player] ~= token then return end
+	local rod = RodRegistry.GetById(enc.rodId or "")
+	local rodForgiveness = rod and rod.reelForgiveness or 0
+	local encounterId = enc.encounterId
+
+	ReelMinigameService.Start(player, encounterId, fish.rarity, rodForgiveness, function(successful)
 		local current = CastingService.GetEncounter(player)
-		if current ~= enc then return end
-		local successful = (reelInputCount[player] or 0) >= 3
-		local correct = enc.correctAction == Actions.Reel and successful
+		if not current or current.encounterId ~= encounterId then return end
+		local correct = successful and (fish.correctAction == Actions.Reel)
+		local quality = successful and 1 or 0.4
 		local outcome
 		if correct then
 			outcome = FishEncounterTypes.OutcomeKinds.CorrectReel
 		else
 			outcome = FishEncounterTypes.OutcomeKinds.WrongAction
 		end
-		RemoteService.FireClient(player, "ReelMinigameResolved", {
-			EncounterId = enc.encounterId,
-			Successful = successful,
-		})
-		finalizeCatch(player, enc, correct, outcome)
+		finalizeCatch(player, current, correct, outcome, quality)
 	end)
 end
 
@@ -174,14 +213,7 @@ local function handleReelInput(player: Player, payload: any)
 	if typeof(payload) ~= "table" then return end
 	if typeof(payload.encounterId) ~= "string" then return end
 	if not RemoteValidation.RequireRateLimit(player, "ReelInput", Constants.RATE_LIMIT_REEL_INPUT) then return end
-	local enc = CastingService.GetEncounter(player)
-	if not enc or enc.encounterId ~= payload.encounterId then return end
-	if enc.state ~= FishEncounterTypes.States.Reeling then return end
-	reelInputCount[player] = (reelInputCount[player] or 0) + 1
-	RemoteService.FireClient(player, "ReelMinigameTick", {
-		EncounterId = enc.encounterId,
-		Count = reelInputCount[player],
-	})
+	ReelMinigameService.OnInput(player, payload.encounterId, payload.holding == true)
 end
 
 function CatchResolutionService.Init()
@@ -194,8 +226,6 @@ function CatchResolutionService.Init()
 
 	Players.PlayerRemoving:Connect(function(player)
 		cutLineStreak[player] = nil
-		activeReelTokens[player] = nil
-		reelInputCount[player] = nil
 	end)
 end
 
