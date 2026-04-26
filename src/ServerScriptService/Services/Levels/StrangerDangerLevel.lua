@@ -226,11 +226,28 @@ local function wireBooth(round, slotModel: Model)
 	for _, part in ipairs(TagQueries.GetTaggedInside(boothFolder, PlayAreaConfig.Tags.BoothSubmit)) do
 		if part:IsA("BasePart") then
 			levelState.SubmitPad = part
+			levelState.SubmitTouching = {}
 			table.insert(round.Connections, part.Touched:Connect(function(other)
 				local character = other:FindFirstAncestorOfClass("Model")
 				local player = character and Players:GetPlayerFromCharacter(character)
-				if player == round.Guide then
+				if player == round.Guide and not levelState.SubmitTouching[player] then
+					levelState.SubmitTouching[player] = true
 					require(script.Parent.Parent:WaitForChild("GuideControlService")).SubmitForPlayer(player)
+				end
+			end))
+			table.insert(round.Connections, part.TouchEnded:Connect(function(other)
+				local character = other:FindFirstAncestorOfClass("Model")
+				local player = character and Players:GetPlayerFromCharacter(character)
+				if player == round.Guide then
+					task.delay(0.2, function()
+						for _, touchingPart in ipairs(part:GetTouchingParts()) do
+							local touchingCharacter = touchingPart:FindFirstAncestorOfClass("Model")
+							if touchingCharacter and Players:GetPlayerFromCharacter(touchingCharacter) == player then
+								return
+							end
+						end
+						levelState.SubmitTouching[player] = nil
+					end)
 				end
 			end))
 			break

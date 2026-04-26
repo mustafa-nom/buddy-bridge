@@ -73,6 +73,9 @@ local function assignRoles(spawns)
 	local scored = {}
 	for i, spawn in ipairs(spawns) do
 		local bias = spawn.Anchor and ANCHOR_RISK_BIAS[spawn.Anchor] or 1
+		if typeof(bias) ~= "number" then
+			bias = 1
+		end
 		table.insert(scored, { Index = i, Score = bias + math.random() })
 	end
 	table.sort(scored, function(a, b)
@@ -80,7 +83,8 @@ local function assignRoles(spawns)
 	end)
 
 	local roles = table.create(#spawns, ScenarioTypes.NpcRoles.Safe)
-	for i = 1, math.min(Constants.STRANGER_DANGER_RISKY_COUNT, #scored) do
+	local riskyCount = Constants.STRANGER_DANGER_RISKY_COUNT or 3
+	for i = 1, math.min(riskyCount, #scored) do
 		roles[scored[i].Index] = ScenarioTypes.NpcRoles.Risky
 	end
 	return roles
@@ -100,11 +104,17 @@ end
 
 function StrangerDangerScenario.Generate(levelModel: Model): any?
 	local spawns = gatherSpawnPoints(levelModel)
-	if #spawns < Constants.STRANGER_DANGER_RISKY_COUNT then
+	local riskyCount = Constants.STRANGER_DANGER_RISKY_COUNT or 3
+	if #spawns < riskyCount then
 		warn("StrangerDangerScenario: fewer than 3 BuddyNpcSpawn parts in level")
 		return nil
 	end
-	local badges = shuffle(BadgeConfig.AllBadges())
+	local allBadges = BadgeConfig.AllBadges()
+	if #spawns > #allBadges then
+		warn("StrangerDangerScenario: more NPCs than unique badge pairs")
+		return nil
+	end
+	local badges = shuffle(allBadges)
 	local roles = assignRoles(spawns)
 	local npcs, answerBadges = {}, {}
 

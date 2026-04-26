@@ -3,6 +3,7 @@
 -- Resolves the SurfaceGui via the slot index in RoundStarted payload.
 
 local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
@@ -30,13 +31,26 @@ local state = {
 	-- Polished book overlay shown for the Guide on top of the SurfaceGui
 	-- manual.
 	Book = nil :: any?,
+	ManualOpen = false,
+	ToggleGui = nil :: ScreenGui?,
+	ToggleButton = nil :: TextButton?,
 }
+
+local renderManual: () -> ()
 
 local function destroyBook()
 	if state.Book then
 		state.Book:Destroy()
 		state.Book = nil
 	end
+end
+
+local function destroyActiveManual()
+	if state.ActiveManual then
+		state.ActiveManual:Destroy()
+		state.ActiveManual = nil
+	end
+	destroyBook()
 end
 
 local function ensureBook()
@@ -46,9 +60,47 @@ local function ensureBook()
 		return
 	end
 	if state.Book then return end
-	local players = game:GetService("Players")
-	local playerGui = players.LocalPlayer:WaitForChild("PlayerGui")
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 	state.Book = BookView.new(playerGui, StrangerDangerBookContent)
+end
+
+local function updateToggle()
+	if not state.ToggleButton then return end
+	state.ToggleButton.Visible = state.Role == RoleTypes.Guide and state.LevelType ~= nil and state.ManualPayload ~= nil
+	state.ToggleButton.Text = state.ManualOpen and "Close Manual" or "Open Manual"
+end
+
+local function ensureToggle()
+	if state.ToggleGui and state.ToggleButton then
+		updateToggle()
+		return
+	end
+	local screen = Instance.new("ScreenGui")
+	screen.Name = "BB_GuideManualToggle"
+	screen.ResetOnSpawn = false
+	screen.IgnoreGuiInset = true
+	screen.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+	local button = UIStyle.MakeButton({
+		Name = "Toggle",
+		Size = UDim2.fromOffset(180, 46),
+		Position = UDim2.fromOffset(24, 112),
+		Text = "Open Manual",
+		TextSize = UIStyle.TextSize.Body,
+		Parent = screen,
+	})
+	button.Activated:Connect(function()
+		state.ManualOpen = not state.ManualOpen
+		if state.ManualOpen then
+			renderManual()
+		else
+			destroyActiveManual()
+			updateToggle()
+		end
+	end)
+	state.ToggleGui = screen
+	state.ToggleButton = button
+	updateToggle()
 end
 
 local function findControlPanelSurfaceGui(): SurfaceGui?
@@ -82,11 +134,10 @@ local function getRenderTarget(): Instance
 		return surfaceGui
 	end
 	if not state.FallbackContainer then
-		local players = game:GetService("Players")
 		local screen = Instance.new("ScreenGui")
 		screen.Name = "BB_GuideManualFallback"
 		screen.ResetOnSpawn = false
-		screen.Parent = players.LocalPlayer:WaitForChild("PlayerGui")
+		screen.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 		local frame = Instance.new("Frame")
 		frame.Size = UDim2.fromScale(0.3, 0.62)
 		frame.AnchorPoint = Vector2.new(0, 0.5)
@@ -103,10 +154,15 @@ local function getRenderTarget(): Instance
 	return frame or state.FallbackContainer
 end
 
-local function renderManual()
+renderManual = function()
 	if state.Role ~= RoleTypes.Guide then return end
 	if not state.LevelType then return end
 	if not state.ManualPayload then return end
+	if not state.ManualOpen then
+		destroyActiveManual()
+		updateToggle()
+		return
+	end
 	local target = getRenderTarget()
 	if state.ActiveManual then
 		state.ActiveManual:Destroy()
@@ -117,10 +173,19 @@ local function renderManual()
 	elseif state.LevelType == LevelTypes.BackpackCheckpoint then
 		state.ActiveManual = BackpackCheckpointManual.Build(target, state.ManualPayload)
 	end
+	if state.LevelType == LevelTypes.StrangerDangerPark then
+		ensureBook()
+	end
+	updateToggle()
 end
 
 RemoteService.OnClientEvent("RoleAssigned", function(payload)
 	state.Role = payload.Role or RoleTypes.None
+	ensureToggle()
+	if state.Role ~= RoleTypes.Guide then
+		state.ManualOpen = false
+		destroyActiveManual()
+	end
 end)
 
 RemoteService.OnClientEvent("RoundStarted", function(payload)
@@ -132,6 +197,10 @@ end)
 RemoteService.OnClientEvent("LevelStarted", function(payload)
 	if payload.RoundId ~= state.RoundId then return end
 	state.LevelType = payload.LevelType
+	state.ManualOpen = false
+	state.ManualPayload = nil
+	destroyActiveManual()
+	updateToggle()
 	-- Manual will arrive separately via GuideManualUpdated for the Guide.
 	-- For the Explorer, we just clear local state.
 	if state.Role ~= RoleTypes.Guide then
@@ -149,8 +218,9 @@ RemoteService.OnClientEvent("GuideManualUpdated", function(payload)
 	if payload.RoundId ~= state.RoundId then return end
 	state.ManualPayload = payload.Manual
 	state.LevelType = payload.LevelType
-	renderManual()
-	ensureBook()
+	state.ManualOpen = false
+	destroyActiveManual()
+	ensureToggle()
 end)
 
 RemoteService.OnClientEvent("NpcDialogNoteAdded", function(payload)
@@ -197,24 +267,24 @@ end)
 
 RemoteService.OnClientEvent("LevelEnded", function(payload)
 	if payload.RoundId ~= state.RoundId then return end
-	if state.ActiveManual then
-		state.ActiveManual:Destroy()
-		state.ActiveManual = nil
-	end
-	destroyBook()
+	state.ManualOpen = false
+	destroyActiveManual()
+	updateToggle()
 end)
 
 RemoteService.OnClientEvent("RoundEnded", function(_payload)
 	state.RoundId = nil
 	state.LevelType = nil
 	state.ManualPayload = nil
-	if state.ActiveManual then
-		state.ActiveManual:Destroy()
-		state.ActiveManual = nil
-	end
+	state.ManualOpen = false
+	destroyActiveManual()
 	if state.FallbackContainer then
 		state.FallbackContainer:Destroy()
 		state.FallbackContainer = nil
 	end
-	destroyBook()
+	if state.ToggleGui then
+		state.ToggleGui:Destroy()
+		state.ToggleGui = nil
+		state.ToggleButton = nil
+	end
 end)

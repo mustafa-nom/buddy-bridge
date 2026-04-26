@@ -31,7 +31,26 @@ local state = {
 	PreviousMinZoom = nil :: number?,
 	PreviousMaxZoom = nil :: number?,
 	PreviousFieldOfView = nil :: number?,
+	RetryToken = 0,
+	RetryCount = 0,
 }
+
+local MAX_CAMERA_RETRIES = 120
+local tryActivate: () -> ()
+
+local function scheduleRetry()
+	state.RetryCount += 1
+	if state.RetryCount > MAX_CAMERA_RETRIES then
+		warn("GuideCameraController: could not find booth camera target")
+		return
+	end
+	local token = state.RetryToken
+	task.delay(0.1, function()
+		if token == state.RetryToken then
+			tryActivate()
+		end
+	end)
+end
 
 local function findBoothModel(): Model?
 	if not state.SlotIndex then return nil end
@@ -83,19 +102,18 @@ local function startRenderLock(camera: Camera)
 	end)
 end
 
-local function tryActivate()
+tryActivate = function()
 	if state.Role ~= RoleTypes.Guide or not state.LevelType then return end
 	local camera = Workspace.CurrentCamera
 	if not camera then return end
 	local boothModel = findBoothModel()
 	if not boothModel then
-		-- if the booth hasn't replicated yet, retry on the next frame
-		task.defer(tryActivate)
+		scheduleRetry()
 		return
 	end
 	local frame = boothCameraFrame(boothModel)
 	if not frame then
-		task.defer(tryActivate)
+		scheduleRetry()
 		return
 	end
 	if not state.Active then
@@ -105,6 +123,7 @@ local function tryActivate()
 		state.PreviousFieldOfView = camera.FieldOfView
 	end
 	state.CameraFrame = frame
+	state.RetryCount = 0
 	LocalPlayer.CameraMode = Enum.CameraMode.Classic
 	LocalPlayer.CameraMinZoomDistance = 8
 	LocalPlayer.CameraMaxZoomDistance = 18
@@ -157,22 +176,28 @@ RemoteService.OnClientEvent("RoundStarted", function(payload)
 	state.RoundId = payload.RoundId
 	state.SlotIndex = payload.SlotIndex
 	state.BoothName = payload.BoothName
+	state.RetryToken += 1
+	state.RetryCount = 0
 end)
 
 RemoteService.OnClientEvent("LevelStarted", function(payload)
 	if payload.RoundId ~= state.RoundId then return end
 	state.LevelType = payload.LevelType
+	state.RetryToken += 1
+	state.RetryCount = 0
 	tryActivate()
 end)
 
 RemoteService.OnClientEvent("LevelEnded", function(payload)
 	if payload.RoundId ~= state.RoundId then return end
 	state.LevelType = nil
+	state.RetryToken += 1
 	release()
 end)
 
 RemoteService.OnClientEvent("RoundEnded", function(_payload)
 	state.RoundId = nil
 	state.LevelType = nil
+	state.RetryToken += 1
 	release()
 end)
