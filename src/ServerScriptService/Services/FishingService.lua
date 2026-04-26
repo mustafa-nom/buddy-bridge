@@ -87,7 +87,7 @@ local function startReel(player: Player)
 	end)
 end
 
-local function onCast(player: Player)
+local function onCast(player: Player, clientAim: any)
 	local ok, _ = RemoteValidation.RunChain({
 		function() return RemoteValidation.RequirePlayer(player) end,
 		function() return RemoteValidation.RequireRateLimit(player, "Cast", PhishConstants.RATE_LIMIT_CAST) end,
@@ -99,8 +99,35 @@ local function onCast(player: Player)
 		RemoteService.FireClient(player, "Notify", { kind = "Error", message = "Walk to the dock to cast." })
 		return
 	end
+
+	-- Resolve the actual landing position. The client sends a Vector3 from
+	-- mouse.Hit; we validate it's a real Vector3 within cast range of the
+	-- player's cast zone, and snap it to the water surface (Y = 0.5). If it
+	-- fails any check, fall back to a point ~12 studs out from the zone.
+	local castOrigin = zone.Position
+	local landing: Vector3
+	if typeof(clientAim) == "Vector3" then
+		local horiz = Vector2.new(clientAim.X - castOrigin.X, clientAim.Z - castOrigin.Z)
+		local horizDist = horiz.Magnitude
+		if horizDist > PhishConstants.CAST_RANGE_STUDS then
+			-- Clamp the aim to max cast range along the same direction.
+			local dir = horiz.Unit
+			landing = Vector3.new(
+				castOrigin.X + dir.X * PhishConstants.CAST_RANGE_STUDS,
+				0.5,
+				castOrigin.Z + dir.Y * PhishConstants.CAST_RANGE_STUDS
+			)
+		else
+			landing = Vector3.new(clientAim.X, 0.5, clientAim.Z)
+		end
+	else
+		-- No aim from client (older rod, alt input). Cast 12 studs forward
+		-- from the cast zone using a sensible default direction.
+		landing = castOrigin + Vector3.new(12, 0, 0)
+	end
+
 	setState(player, "Waiting")
-	RemoteService.FireClient(player, "CastStarted", { aim = zone.Position })
+	RemoteService.FireClient(player, "CastStarted", { aim = landing })
 	scheduleBite(player)
 end
 
