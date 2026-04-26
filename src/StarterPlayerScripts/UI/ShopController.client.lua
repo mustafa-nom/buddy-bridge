@@ -94,14 +94,15 @@ local function buildRodPreview(rodId: string, parent: Instance, size: UDim2, pos
 	end
 
 	local boundsCFrame, boundsSize = clone:GetBoundingBox()
-	local basePivot = CFrame.new(-boundsCFrame.Position) * clone:GetPivot()
+	-- Keep the rod handle above the card baseline while spinning.
+	local basePivot = CFrame.new(-boundsCFrame.Position + Vector3.new(0, boundsSize.Y * 0.12, 0)) * clone:GetPivot()
 	clone:PivotTo(CFrame.Angles(0, math.rad(-28), 0) * basePivot)
 
 	local cam = Instance.new("Camera")
 	cam.FieldOfView = 30
 	local maxSize = math.max(boundsSize.X, boundsSize.Y, boundsSize.Z)
 	local distance = math.max(5, maxSize * 1.6)
-	cam.CFrame = CFrame.new(Vector3.new(distance * 0.42, distance * 0.08, distance), Vector3.zero)
+	cam.CFrame = CFrame.new(Vector3.new(distance * 0.42, distance * 0.08, distance), Vector3.new(0, boundsSize.Y * 0.08, 0))
 	cam.Parent = vf
 	vf.CurrentCamera = cam
 
@@ -119,7 +120,7 @@ end
 local function makeShopPreviewFrame(parent: Instance, name: string, topColor: Color3, bottomColor: Color3): ViewportFrame
 	local vf = Instance.new("ViewportFrame")
 	vf.Name = name
-	vf.Size = UDim2.fromScale(1, 0.36)
+	vf.Size = UDim2.fromScale(1, 0.42)
 	vf.BackgroundColor3 = topColor
 	vf.BorderSizePixel = 0
 	vf.LightDirection = Vector3.new(-0.35, -0.85, -0.4)
@@ -660,24 +661,24 @@ local function buildCatcherCard(parent: Instance, catcher: CatcherCatalog.Catche
 
 	UIStyle.MakeLabel({
 		Size = UDim2.new(1, -16, 0, 22),
-		Position = UDim2.new(0, 8, 0.38, 4),
+		Position = UDim2.new(0, 8, 0.42, 6),
 		Text = catcher.name,
 		Font = UIStyle.FontBold,
 		TextSize = UIStyle.TextSize.Body,
 		Parent = card,
 	})
 	UIStyle.MakeLabel({
-		Size = UDim2.new(1, -16, 0, 52),
-		Position = UDim2.new(0, 8, 0.38, 30),
+		Size = UDim2.new(1, -16, 0, 64),
+		Position = UDim2.new(0, 8, 0.42, 32),
 		Text = catcher.description,
 		TextWrapped = true,
-		TextSize = UIStyle.TextSize.Caption,
+		TextSize = UIStyle.TextSize.Subtitle,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		Parent = card,
 	})
 	UIStyle.MakeLabel({
 		Size = UDim2.new(1, -16, 0, 18),
-		Position = UDim2.new(0, 8, 1, -88),
+		Position = UDim2.new(0, 8, 1, -100),
 		Text = string.format("Owned %d | Ready %d | Cap %d", owned, available, catcher.capacity),
 		TextSize = UIStyle.TextSize.Caption,
 		TextColor3 = UIStyle.Palette.TextMuted,
@@ -686,14 +687,14 @@ local function buildCatcherCard(parent: Instance, catcher: CatcherCatalog.Catche
 
 	local priceFrame = Instance.new("Frame")
 	priceFrame.Size = UDim2.new(0.48, -10, 0, 26)
-	priceFrame.Position = UDim2.new(0, 8, 1, -62)
+	priceFrame.Position = UDim2.new(0, 8, 1, -72)
 	priceFrame.BackgroundTransparency = 1
 	priceFrame.Parent = card
 	IconFactory.Pill(priceFrame, IconFactory.Coin(18), tostring(catcher.price), UIStyle.Palette.TextPrimary, UIStyle.TextSize.Body)
 
 	local buyBtn = UIStyle.MakeButton({
-		Size = UDim2.new(1, -16, 0, 30),
-		Position = UDim2.new(0, 8, 1, -34),
+		Size = UDim2.new(1, -16, 0, 34),
+		Position = UDim2.new(0, 8, 1, -38),
 		Text = "BUY",
 		TextSize = UIStyle.TextSize.Body,
 		BackgroundColor3 = (localState.coins >= catcher.price) and UIStyle.Palette.Safe or UIStyle.Palette.TextMuted,
@@ -720,24 +721,24 @@ local function buildGearCard(parent: Instance, gear: GearCatalog.Gear): Frame
 	local owned = (localState.ownedGear :: any)[gear.id] or 0
 	UIStyle.MakeLabel({
 		Size = UDim2.new(1, -16, 0, 22),
-		Position = UDim2.new(0, 8, 0.38, 4),
+		Position = UDim2.new(0, 8, 0.42, 6),
 		Text = gear.name,
 		Font = UIStyle.FontBold,
 		TextSize = UIStyle.TextSize.Body,
 		Parent = card,
 	})
 	UIStyle.MakeLabel({
-		Size = UDim2.new(1, -16, 0, 52),
-		Position = UDim2.new(0, 8, 0.38, 30),
+		Size = UDim2.new(1, -16, 0, 64),
+		Position = UDim2.new(0, 8, 0.42, 32),
 		Text = gear.description,
 		TextWrapped = true,
-		TextSize = UIStyle.TextSize.Caption,
+		TextSize = UIStyle.TextSize.Subtitle,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		Parent = card,
 	})
 	UIStyle.MakeLabel({
 		Size = UDim2.new(1, -16, 0, 18),
-		Position = UDim2.new(0, 8, 1, -88),
+		Position = UDim2.new(0, 8, 1, -100),
 		Text = string.format("Owned %d | Radius %d | %ds", owned, gear.radius, gear.durationSeconds),
 		TextSize = UIStyle.TextSize.Caption,
 		TextColor3 = UIStyle.Palette.TextMuted,
@@ -746,14 +747,14 @@ local function buildGearCard(parent: Instance, gear: GearCatalog.Gear): Frame
 
 	local priceFrame = Instance.new("Frame")
 	priceFrame.Size = UDim2.new(0.48, -10, 0, 26)
-	priceFrame.Position = UDim2.new(0, 8, 1, -62)
+	priceFrame.Position = UDim2.new(0, 8, 1, -72)
 	priceFrame.BackgroundTransparency = 1
 	priceFrame.Parent = card
 	IconFactory.Pill(priceFrame, IconFactory.Coin(18), tostring(gear.price), UIStyle.Palette.TextPrimary, UIStyle.TextSize.Body)
 
 	local buyBtn = UIStyle.MakeButton({
-		Size = UDim2.new(1, -16, 0, 30),
-		Position = UDim2.new(0, 8, 1, -34),
+		Size = UDim2.new(1, -16, 0, 34),
+		Position = UDim2.new(0, 8, 1, -38),
 		Text = "BUY",
 		TextSize = UIStyle.TextSize.Body,
 		BackgroundColor3 = (localState.coins >= gear.price) and UIStyle.Palette.Safe or UIStyle.Palette.TextMuted,
@@ -1016,7 +1017,7 @@ local function openShop()
 		row.Parent = content
 
 		local grid = Instance.new("UIGridLayout")
-		grid.CellSize = UDim2.fromOffset(200, 280)
+		grid.CellSize = UDim2.fromOffset(240, 340)
 		grid.CellPadding = UDim2.fromOffset(12, 12)
 		grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		grid.VerticalAlignment = Enum.VerticalAlignment.Top
