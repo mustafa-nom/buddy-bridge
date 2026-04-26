@@ -4,7 +4,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Modules = ReplicatedStorage:WaitForChild("Modules")
 local LevelTypes = require(Modules:WaitForChild("LevelTypes"))
-local Constants = require(Modules:WaitForChild("Constants"))
 
 local RoundState = {}
 
@@ -19,8 +18,7 @@ export type Round = {
 	StartedAt: number,
 	Mistakes: number,
 	TrustPoints: number,
-	AttemptsLeft: number,
-	BoothState: { [string]: any },
+	CluesCollected: number,
 	ItemsSorted: number,
 	CompletedLevels: { string },
 	ActiveScenario: any?,
@@ -53,15 +51,7 @@ function RoundState.New(explorer: Player, guide: Player, pairId: string, slotInd
 		StartedAt = os.clock(),
 		Mistakes = 0,
 		TrustPoints = 0,
-		AttemptsLeft = Constants.STRANGER_DANGER_ATTEMPTS,
-		BoothState = {
-			Slots = {
-				{ Color = nil, Shape = nil, Locked = false, Status = "Empty" },
-				{ Color = nil, Shape = nil, Locked = false, Status = "Empty" },
-				{ Color = nil, Shape = nil, Locked = false, Status = "Empty" },
-			},
-			History = {},
-		},
+		CluesCollected = 0,
 		ItemsSorted = 0,
 		CompletedLevels = {},
 		ActiveScenario = nil,
@@ -121,8 +111,7 @@ function RoundState.SnapshotForClient(round: Round): { [string]: any }
 		CurrentLevelIndex = round.CurrentLevelIndex,
 		Mistakes = round.Mistakes,
 		TrustPoints = round.TrustPoints,
-		AttemptsLeft = round.AttemptsLeft,
-		BoothState = round.BoothState,
+		CluesCollected = round.CluesCollected,
 		ItemsSorted = round.ItemsSorted,
 		CompletedLevels = round.CompletedLevels,
 		StartedAt = round.StartedAt,

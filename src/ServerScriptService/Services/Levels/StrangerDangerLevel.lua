@@ -1,6 +1,9 @@
 --!strict
--- Stranger Danger Park level setup: NPC badges plus Guide booth controls.
+-- Stranger Danger Park: applies the scenario to the cloned level instance.
+-- Spawns NPCs at BuddyNpcSpawn parts, attaches accessories per trait,
+-- adds ProximityPrompts, activates puppy on completion.
 
+local CollectionService = game:GetService("CollectionService")
 local ServerStorage = game:GetService("ServerStorage")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,19 +12,10 @@ local Constants = require(Modules:WaitForChild("Constants"))
 local PlayAreaConfig = require(Modules:WaitForChild("PlayAreaConfig"))
 local TagQueries = require(Modules:WaitForChild("TagQueries"))
 local LevelTypes = require(Modules:WaitForChild("LevelTypes"))
-local BadgeConfig = require(Modules:WaitForChild("BadgeConfig"))
+local NpcRegistry = require(Modules:WaitForChild("NpcRegistry"))
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 
 local StrangerDangerLevel = {}
-
-local function findSlotModel(round): Model?
-	for _, candidate in ipairs(TagQueries.GetSortedSlots()) do
-		if candidate:GetAttribute(PlayAreaConfig.Attributes.SlotIndex) == round.SlotIndex then
-			return candidate
-		end
-	end
-	return nil
-end
 
 local function getLevelModel(slot: Model): Model?
 	local playArea = slot:FindFirstChild(Constants.SLOT_PLAY_AREA_FOLDER)
@@ -53,6 +47,8 @@ local function pickRandomTemplate(): Model?
 	return options[math.random(#options)]
 end
 
+-- prefer the archetype the scenario picked; fall back to random so demos
+-- still work if a template happens to be missing
 local function pickTemplateForArchetype(archetype: string?): Model?
 	local templates = ServerStorage:FindFirstChild("NpcTemplates")
 	if templates and archetype then
@@ -65,12 +61,16 @@ local function pickTemplateForArchetype(archetype: string?): Model?
 end
 
 local function attachKnifeAccessory(npcModel: Model)
+	-- Look for a "Knife" accessory in the NpcTemplates folder, or build a
+	-- placeholder block. Kid-friendly: blocky cartoon, grey, no gore.
 	local templates = ServerStorage:FindFirstChild("NpcTemplates")
 	local knifeTemplate = templates and templates:FindFirstChild("KnifeAccessory")
-	local knife: Instance
+	local knife: Instance?
 	if knifeTemplate then
 		knife = knifeTemplate:Clone()
 	else
+		-- Fallback: a small grey block welded to the NPC's right hand or
+		-- HumanoidRootPart so the trait reads on screen.
 		local part = Instance.new("Part")
 		part.Name = "KnifePlaceholder"
 		part.Size = Vector3.new(0.4, 0.4, 1.2)
@@ -80,91 +80,20 @@ local function attachKnifeAccessory(npcModel: Model)
 		part.CanCollide = false
 		knife = part
 	end
+	if not knife then
+		return
+	end
 	local hand = npcModel:FindFirstChild("RightHand") or npcModel:FindFirstChild("Right Arm") or npcModel.PrimaryPart
 	if hand and knife:IsA("BasePart") and hand:IsA("BasePart") then
 		knife.Parent = npcModel
-		knife.CFrame = hand.CFrame * CFrame.new(0, -0.5, -0.5)
 		local weld = Instance.new("WeldConstraint")
 		weld.Part0 = hand
 		weld.Part1 = knife
 		weld.Parent = knife
+		knife.CFrame = hand.CFrame * CFrame.new(0, -0.5, -0.5)
 	else
-		knife.Parent = npcModel
+		(knife :: Instance).Parent = npcModel
 	end
-end
-
-local function findTorso(npcModel: Model): BasePart?
-	local torso = npcModel:FindFirstChild("UpperTorso")
-		or npcModel:FindFirstChild("Torso")
-		or npcModel:FindFirstChild("HumanoidRootPart")
-		or npcModel.PrimaryPart
-	if torso and torso:IsA("BasePart") then
-		return torso
-	end
-	return nil
-end
-
-local function makeSurfaceGui(parent: BasePart, name: string, face: Enum.NormalId): SurfaceGui
-	local existing = parent:FindFirstChild(name)
-	if existing then
-		existing:Destroy()
-	end
-	local surface = Instance.new("SurfaceGui")
-	surface.Name = name
-	surface.Face = face
-	surface.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	surface.PixelsPerStud = 50
-	surface.LightInfluence = 0
-	surface.Parent = parent
-	return surface
-end
-
-local function drawBadge(parent: Instance, colorName: string?, shapeName: string?, status: string?)
-	for _, child in ipairs(parent:GetChildren()) do
-		child:Destroy()
-	end
-	local color = colorName and BadgeConfig.Colors[colorName] or Color3.fromRGB(235, 225, 205)
-	local frame = Instance.new("Frame")
-	frame.Size = UDim2.fromScale(1, 1)
-	frame.BackgroundColor3 = color
-	frame.BorderSizePixel = 0
-	frame.Parent = parent
-
-	local stroke = Instance.new("UIStroke")
-	stroke.Thickness = 8
-	stroke.Color = status == "Correct" and Color3.fromRGB(70, 220, 90)
-		or status == "Wrong" and Color3.fromRGB(230, 60, 60)
-		or Color3.fromRGB(60, 40, 20)
-	stroke.Parent = frame
-
-	local shape = Instance.new("TextLabel")
-	shape.BackgroundTransparency = 1
-	shape.Size = UDim2.fromScale(1, 0.7)
-	shape.Position = UDim2.fromScale(0, 0.08)
-	shape.Font = Enum.Font.Cartoon
-	shape.TextScaled = true
-	shape.TextColor3 = Color3.fromRGB(40, 28, 16)
-	shape.Text = shapeName or "Empty"
-	shape.Parent = frame
-
-	local label = Instance.new("TextLabel")
-	label.BackgroundTransparency = 1
-	label.Size = UDim2.fromScale(1, 0.22)
-	label.Position = UDim2.fromScale(0, 0.74)
-	label.Font = Enum.Font.Cartoon
-	label.TextScaled = true
-	label.TextColor3 = Color3.fromRGB(40, 28, 16)
-	label.Text = colorName and (colorName .. " " .. (shapeName or "")) or (status or "Empty")
-	label.Parent = frame
-end
-
-local function applyNpcBadge(npcModel: Model, badge)
-	local torso = findTorso(npcModel)
-	if not torso then
-		return
-	end
-	local surface = makeSurfaceGui(torso, "BB_BadgeGui", Enum.NormalId.Front)
-	drawBadge(surface, badge.Color, badge.Shape, nil)
 end
 
 local function buildPromptOnNpc(npcModel: Model, npcId: string)
@@ -178,6 +107,7 @@ local function buildPromptOnNpc(npcModel: Model, npcId: string)
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = Constants.INSPECT_RADIUS_STUDS
 	prompt.RequiresLineOfSight = false
+	prompt.Style = Enum.ProximityPromptStyle.Default
 	prompt:SetAttribute("BB_NpcId", npcId)
 	prompt.Parent = root
 end
@@ -186,8 +116,8 @@ local function setNpcAttributes(npcModel: Model, npcInfo)
 	npcModel:SetAttribute("BB_NpcId", npcInfo.Id)
 	npcModel:SetAttribute("BB_Role", npcInfo.Role)
 	npcModel:SetAttribute("BB_SpawnPointId", npcInfo.SpawnPointId)
-	npcModel:SetAttribute("BB_BadgeColor", npcInfo.Badge.Color)
-	npcModel:SetAttribute("BB_BadgeShape", npcInfo.Badge.Shape)
+	-- Note: traits are not exposed as attributes — only revealed via
+	-- NpcDescriptionShown remote when the Explorer inspects.
 	for _, trait in ipairs(npcInfo.Traits) do
 		if trait == "HoldingKnife" then
 			attachKnifeAccessory(npcModel)
@@ -195,98 +125,64 @@ local function setNpcAttributes(npcModel: Model, npcInfo)
 	end
 end
 
-local function resetBoothState(round)
-	round.AttemptsLeft = Constants.STRANGER_DANGER_ATTEMPTS
-	round.BoothState = {
-		Slots = {
-			{ Color = nil, Shape = nil, Locked = false, Status = "Empty" },
-			{ Color = nil, Shape = nil, Locked = false, Status = "Empty" },
-			{ Color = nil, Shape = nil, Locked = false, Status = "Empty" },
-		},
-		History = {},
-	}
-end
-
-function StrangerDangerLevel.RefreshBoothDisplays(round)
-	local state = round.BoothState
-	local levelState = round.LevelState[LevelTypes.StrangerDangerPark]
-	if not levelState or not levelState.BoothSlots then
+local function activatePuppyMarker(levelModel: Model, scenario)
+	if not scenario.PuppySpawnId or scenario.PuppySpawnId == "" then
 		return
 	end
-	for slotIndex, part in pairs(levelState.BoothSlots) do
-		if part and part.Parent then
-			local surface = makeSurfaceGui(part, "BB_SlotGui", Enum.NormalId.Top)
-			local slot = state.Slots[slotIndex]
-			drawBadge(surface, slot.Color, slot.Shape, slot.Status)
+	-- Find the chosen puppy spawn and put a placeholder marker on it.
+	-- The actual puppy reveal happens after 3 clues are collected.
+	for _, part in ipairs(TagQueries.GetTaggedInside(levelModel, PlayAreaConfig.Tags.PuppySpawn)) do
+		if part:GetFullName() == scenario.PuppySpawnId then
+			part:SetAttribute("BB_IsChosen", true)
+		else
+			part:SetAttribute("BB_IsChosen", false)
 		end
 	end
-	if levelState.SubmitPad then
-		local surface = makeSurfaceGui(levelState.SubmitPad, "BB_AttemptsGui", Enum.NormalId.Top)
-		drawBadge(surface, nil, nil, ("Attempts: %d"):format(round.AttemptsLeft))
-	end
-	RemoteService.FirePair(round, "BoothStateUpdated", {
-		RoundId = round.RoundId,
-		AttemptsLeft = round.AttemptsLeft,
-		BoothState = state,
-	})
 end
 
-local function wireBooth(round, slotModel: Model)
-	local boothFolder = slotModel:FindFirstChild(Constants.SLOT_BOOTH_FOLDER)
-	if not boothFolder then
-		return
-	end
-	local levelState = round.LevelState[LevelTypes.StrangerDangerPark]
-	levelState.BoothSlots = {}
-
-	for _, part in ipairs(TagQueries.GetTaggedInside(boothFolder, PlayAreaConfig.Tags.BoothSlot)) do
+local function activateLevelExitForPuppy(levelModel: Model, scenario)
+	-- The level template ships with one or more LevelExit triggers; for MVP
+	-- we just activate them all once the puppy is found.
+	for _, part in ipairs(TagQueries.GetTaggedInside(levelModel, PlayAreaConfig.Tags.LevelExit)) do
 		if part:IsA("BasePart") then
-			local slotIndex = part:GetAttribute(PlayAreaConfig.Attributes.BoothSlotIndex)
-			if typeof(slotIndex) == "number" and slotIndex >= 1 and slotIndex <= 3 then
-				levelState.BoothSlots[slotIndex] = part
-				local click = part:FindFirstChildOfClass("ClickDetector") or Instance.new("ClickDetector")
-				click.MaxActivationDistance = 18
-				click.Parent = part
-				local conn = click.MouseClick:Connect(function(player)
-					if player ~= round.Guide then
-						return
-					end
-					local slot = round.BoothState.Slots[slotIndex]
-					if slot and not slot.Locked then
-						RemoteService.FireClient(player, "OpenSlotPicker", {
-							RoundId = round.RoundId,
-							SlotIndex = slotIndex,
-							Current = slot,
-						})
-					end
-				end)
-				table.insert(round.Connections, conn)
-			end
+			part:SetAttribute("BB_Active", true)
 		end
 	end
+end
 
-	for _, part in ipairs(TagQueries.GetTaggedInside(boothFolder, PlayAreaConfig.Tags.BoothSubmit)) do
+local function wireLevelExits(round, levelModel: Model, onComplete: () -> ())
+	for _, part in ipairs(TagQueries.GetTaggedInside(levelModel, PlayAreaConfig.Tags.LevelExit)) do
 		if part:IsA("BasePart") then
-			levelState.SubmitPad = part
-			local conn = part.Touched:Connect(function(other)
+			local conn
+			conn = part.Touched:Connect(function(other)
+				if not round.IsActive then return end
+				if not part:GetAttribute("BB_Active") then return end
 				local character = other:FindFirstAncestorOfClass("Model")
-				local player = character and game:GetService("Players"):GetPlayerFromCharacter(character)
-				if player ~= round.Guide then
-					return
-				end
-				local Services = script.Parent.Parent
-				local GuideControlService = require(Services:WaitForChild("GuideControlService"))
-				GuideControlService.SubmitForPlayer(player)
+				if not character then return end
+				local Players = game:GetService("Players")
+				local player = Players:GetPlayerFromCharacter(character)
+				if not player or player ~= round.Explorer then return end
+				if conn then conn:Disconnect() end
+				onComplete()
 			end)
 			table.insert(round.Connections, conn)
-			break
 		end
 	end
-	StrangerDangerLevel.RefreshBoothDisplays(round)
 end
 
 function StrangerDangerLevel.Begin(round, scenario)
-	local slotModel = findSlotModel(round)
+	local slot = round and round.SlotIndex
+	if not slot then
+		return false
+	end
+	-- Find slot model
+	local slotModel
+	for _, candidate in ipairs(TagQueries.GetSortedSlots()) do
+		if candidate:GetAttribute(PlayAreaConfig.Attributes.SlotIndex) == round.SlotIndex then
+			slotModel = candidate
+			break
+		end
+	end
 	if not slotModel then
 		warn("StrangerDangerLevel: slot not found")
 		return false
@@ -297,17 +193,22 @@ function StrangerDangerLevel.Begin(round, scenario)
 		return false
 	end
 
-	resetBoothState(round)
 	round.LevelState[LevelTypes.StrangerDangerPark] = round.LevelState[LevelTypes.StrangerDangerPark] or {}
 	local levelState = round.LevelState[LevelTypes.StrangerDangerPark]
 	levelState.LevelModel = levelModel
 	levelState.NpcModels = {}
 
+	-- Spawn each NPC
 	for _, npcInfo in ipairs(scenario.Npcs) do
 		local spawnPart = TagQueries.GetNpcSpawnById(levelModel, npcInfo.SpawnPointId)
-		local template = pickTemplateForArchetype(npcInfo.Archetype)
-		if not spawnPart or not template then
+		if not spawnPart then
+			warn(("StrangerDangerLevel: spawn part not found for id %s"):format(npcInfo.SpawnPointId))
 			continue
+		end
+		local template = pickTemplateForArchetype(npcInfo.Archetype)
+		if not template then
+			warn("StrangerDangerLevel: no NPC templates available in ServerStorage/NpcTemplates")
+			break
 		end
 		local clone = template:Clone()
 		clone.Name = npcInfo.Id
@@ -316,7 +217,6 @@ function StrangerDangerLevel.Begin(round, scenario)
 			clone:PivotTo(spawnPart.CFrame + Vector3.new(0, 3, 0))
 		end
 		setNpcAttributes(clone, npcInfo)
-		applyNpcBadge(clone, npcInfo.Badge)
 		if npcInfo.Bark then
 			clone:SetAttribute("BB_Bark", npcInfo.Bark)
 		end
@@ -327,8 +227,20 @@ function StrangerDangerLevel.Begin(round, scenario)
 		levelState.NpcModels[npcInfo.Id] = clone
 	end
 
-	wireBooth(round, slotModel)
+	activatePuppyMarker(levelModel, scenario)
 
+	-- Wire LevelExit touch → level complete. Use a lazy require to avoid
+	-- a circular import at module-load time (LevelService requires this
+	-- module, so we can't require it back at the top).
+	wireLevelExits(round, levelModel, function()
+		task.spawn(function()
+			local Services = script.Parent.Parent
+			local LevelService = require(Services:WaitForChild("LevelService"))
+			LevelService.CompleteLevel(round, LevelTypes.StrangerDangerPark)
+		end)
+	end)
+
+	-- Push manual to Guide
 	RemoteService.FireClient(round.Guide, "GuideManualUpdated", {
 		RoundId = round.RoundId,
 		LevelType = LevelTypes.StrangerDangerPark,
@@ -338,21 +250,42 @@ function StrangerDangerLevel.Begin(round, scenario)
 	return true
 end
 
-function StrangerDangerLevel.Cleanup(round)
-	local levelState = round.LevelState[LevelTypes.StrangerDangerPark]
-	if not levelState then
-		return
-	end
-	if levelState.NpcModels then
-		for _, model in pairs(levelState.NpcModels) do
-			if model and model.Parent then
-				model:Destroy()
+function StrangerDangerLevel.OnClueCollected(round, scenario)
+	if round.CluesCollected >= Constants.CLUES_TO_FIND then
+		local slotModel
+		for _, candidate in ipairs(TagQueries.GetSortedSlots()) do
+			if candidate:GetAttribute(PlayAreaConfig.Attributes.SlotIndex) == round.SlotIndex then
+				slotModel = candidate
+				break
 			end
 		end
+		if not slotModel then
+			return
+		end
+		local levelModel = getLevelModel(slotModel)
+		if not levelModel then
+			return
+		end
+		activateLevelExitForPuppy(levelModel, scenario)
+		RemoteService.FirePair(round, "PuppyRevealed", {
+			RoundId = round.RoundId,
+			PuppySpawnId = scenario.PuppySpawnId,
+		})
 	end
-	levelState.NpcModels = nil
-	levelState.BoothSlots = nil
-	levelState.SubmitPad = nil
+end
+
+function StrangerDangerLevel.Cleanup(round)
+	local levelState = round.LevelState[LevelTypes.StrangerDangerPark]
+	if levelState then
+		if levelState.NpcModels then
+			for _, model in pairs(levelState.NpcModels) do
+				if model and model.Parent then
+					model:Destroy()
+				end
+			end
+		end
+		levelState.NpcModels = nil
+	end
 end
 
 return StrangerDangerLevel

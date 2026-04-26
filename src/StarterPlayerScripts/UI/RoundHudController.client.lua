@@ -23,7 +23,8 @@ local activeRoundId: string? = nil
 local roundStartedAt = 0
 local mistakes = 0
 local trustPoints = 0
-local attemptsLeft = 3
+local cluesCollected = 0
+local cluesNeeded = 3
 local itemsSorted = 0
 local itemsTotal = 6
 local levelType: string? = nil
@@ -99,7 +100,7 @@ end
 local function refreshObjective()
 	if not objectiveLabel then return end
 	if levelType == LevelTypes.StrangerDangerPark then
-		objectiveLabel.Text = ("Pick 3 risky badges - %d tries left"):format(attemptsLeft)
+		objectiveLabel.Text = ("Find %d / %d clues"):format(cluesCollected, cluesNeeded)
 	elseif levelType == LevelTypes.BackpackCheckpoint then
 		objectiveLabel.Text = ("Sort %d / %d items"):format(itemsSorted, itemsTotal)
 	else
@@ -123,7 +124,7 @@ RemoteService.OnClientEvent("RoundStarted", function(payload)
 	roundStartedAt = payload.StartedAt or os.clock()
 	mistakes = 0
 	trustPoints = 0
-	attemptsLeft = 3
+	cluesCollected = 0
 	itemsSorted = 0
 	if mistakesLabel then mistakesLabel.Text = "0 misses" end
 	if trustLabel then trustLabel.Text = "0 trust" end
@@ -134,9 +135,12 @@ RemoteService.OnClientEvent("LevelStarted", function(payload)
 	if typeof(payload) ~= "table" then return end
 	if payload.RoundId ~= activeRoundId then return end
 	levelType = payload.LevelType
-	attemptsLeft = 3
+	cluesCollected = 0
 	itemsSorted = 0
 	if payload.Scenario then
+		if payload.Scenario.TotalCluesNeeded then
+			cluesNeeded = payload.Scenario.TotalCluesNeeded
+		end
 		if payload.Scenario.Total then
 			itemsTotal = payload.Scenario.Total
 		end
@@ -153,9 +157,10 @@ RemoteService.OnClientEvent("ScoreUpdated", function(payload)
 	if trustLabel then trustLabel.Text = ("%s trust"):format(NumberFormatter.Comma(trustPoints)) end
 end)
 
-RemoteService.OnClientEvent("BoothStateUpdated", function(payload)
+RemoteService.OnClientEvent("ClueCollected", function(payload)
 	if payload.RoundId ~= activeRoundId then return end
-	attemptsLeft = payload.AttemptsLeft or attemptsLeft
+	cluesCollected = payload.Total or cluesCollected
+	cluesNeeded = payload.NeededTotal or cluesNeeded
 	refreshObjective()
 end)
 

@@ -1,6 +1,6 @@
 --!strict
 -- Locks the Guide's camera to a "looking down at a book" pose while a level
--- is active. The manual itself is a screen UI, so this
+-- is active. The book itself is a full-screen ScreenGui (BookView) so this
 -- camera mostly affects the soft warm context behind it — a slight downward
 -- tilt sells the "I'm reading at a desk" feel.
 --

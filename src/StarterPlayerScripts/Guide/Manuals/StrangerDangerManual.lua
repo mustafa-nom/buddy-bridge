@@ -7,7 +7,6 @@ local Modules = ReplicatedStorage:WaitForChild("Modules")
 local NpcRegistry = require(Modules:WaitForChild("NpcRegistry"))
 local UIStyle = require(Modules:WaitForChild("UIStyle"))
 local ScenarioRegistry = require(Modules:WaitForChild("ScenarioRegistry"))
-local StrangerDangerLogic = require(Modules:WaitForChild("StrangerDangerLogic"))
 
 local StrangerDangerManual = {}
 
@@ -46,14 +45,6 @@ local function makeRow(parent: Frame, tag: string, text: string, kind: string)
 	})
 	label.Parent = row
 	return row
-end
-
-local function cueText(tag: string): string
-	local cue = StrangerDangerLogic.Cues[tag]
-	if cue then
-		return cue.GuideText
-	end
-	return ScenarioRegistry.GetTraitDisplay(tag)
 end
 
 function StrangerDangerManual.Build(parent: Instance, manualPayload): Manual
@@ -102,7 +93,7 @@ function StrangerDangerManual.Build(parent: Instance, manualPayload): Manual
 	local rows: { [string]: Frame } = {}
 	local riskyTags = (manualPayload and manualPayload.RiskyTags) or NpcRegistry.GetTagsByRisk(NpcRegistry.Risk.Risky)
 	for _, tag in ipairs(riskyTags) do
-		rows[tag] = makeRow(frame, tag, cueText(tag), "Risky")
+		rows[tag] = makeRow(frame, tag, ScenarioRegistry.GetTraitDisplay(tag), "Risky")
 	end
 
 	local safeHeader = UIStyle.MakeLabel({
@@ -116,7 +107,7 @@ function StrangerDangerManual.Build(parent: Instance, manualPayload): Manual
 
 	local safeTags = (manualPayload and manualPayload.SafeTags) or NpcRegistry.GetTagsByRisk(NpcRegistry.Risk.Safe)
 	for _, tag in ipairs(safeTags) do
-		rows[tag] = makeRow(frame, tag, cueText(tag), "Safe")
+		rows[tag] = makeRow(frame, tag, ScenarioRegistry.GetTraitDisplay(tag), "Safe")
 	end
 
 	local manual = {} :: Manual

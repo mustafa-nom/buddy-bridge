@@ -68,6 +68,7 @@ function LevelService.StartLevel(round, levelType: string): boolean
 
 	round.ActiveScenario = scenario
 	round.LevelStartedAt = os.clock()
+	round.CluesCollected = 0
 	round.ItemsSorted = 0
 	round.LastInspectedNpcId = nil
 	round.ActiveItemId = nil
@@ -117,7 +118,7 @@ function LevelService.PublicScenarioPayload(scenario)
 		return {
 			Type = scenario.Type,
 			Npcs = npcs,
-			TotalAccusationSlots = 3,
+			TotalCluesNeeded = 3,
 		}
 	elseif scenario.Type == LevelTypes.BackpackCheckpoint then
 		return {
@@ -142,7 +143,7 @@ function LevelService.CompleteLevel(round, levelType: string)
 	local summary = {
 		RoundId = round.RoundId,
 		LevelType = levelType,
-		AttemptsLeft = round.AttemptsLeft,
+		CluesCollected = round.CluesCollected,
 		ItemsSorted = round.ItemsSorted,
 		Mistakes = (round.LevelState[levelType] and round.LevelState[levelType].Mistakes) or 0,
 		Elapsed = (round.LevelState[levelType] and round.LevelState[levelType].Elapsed) or 0,

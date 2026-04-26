@@ -27,14 +27,13 @@ PlayAreaConfig.Tags = {
 	LevelEntry = "LevelEntry",
 	LevelExit = "LevelExit",
 	BuddyNpcSpawn = "BuddyNpcSpawn",
+	PuppySpawn = "PuppySpawn",
 	BuddyConveyor = "BuddyConveyor",
 	BuddyBin = "BuddyBin",
 	BuddyPortal = "BuddyPortal",
 	RoundFinishZone = "RoundFinishZone",
 	BeltStart = "BeltStart",
 	BeltEnd = "BeltEnd",
-	BoothSlot = "BB_BoothSlot",
-	BoothSubmit = "BB_BoothSubmit",
 }
 
 PlayAreaConfig.Attributes = {
@@ -45,7 +44,6 @@ PlayAreaConfig.Attributes = {
 	NpcSpawnId = "NpcSpawnId",
 	LaneId = "LaneId",
 	Anchor = "Anchor",
-	BoothSlotIndex = "BB_SlotIndex",
 }
 
 return PlayAreaConfig

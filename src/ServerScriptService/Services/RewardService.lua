@@ -12,14 +12,6 @@ local DataService = require(Services:WaitForChild("DataService"))
 local RewardService = {}
 
 function RewardService.GrantRunRewards(round, finalScore): { [string]: any }
-	if finalScore.Failed then
-		return {
-			Rank = nil,
-			BaseSeeds = 0,
-			BonusSeeds = 0,
-			TotalSeeds = 0,
-		}
-	end
 	local rank = finalScore.Rank or "Bronze"
 	local baseSeeds = ScoringConfig.TrustSeedsByRank[rank] or ScoringConfig.TrustSeedsByRank.Bronze
 	local bonusSeeds = (finalScore.PerfectLevels or 0) * ScoringConfig.SeedsBonusPerPerfectLevel
