@@ -90,6 +90,11 @@ open = function()
 	gridFrame.ScrollBarThickness = 6
 	gridFrame.Parent = panel
 
+	local gridPadding = Instance.new("UIPadding")
+	gridPadding.PaddingTop = UDim.new(0, 4)
+	gridPadding.PaddingBottom = UDim.new(0, 8)
+	gridPadding.Parent = gridFrame
+
 	local grid = Instance.new("UIGridLayout")
 	grid.CellSize = UDim2.fromOffset(150, 150)
 	grid.CellPadding = UDim2.fromOffset(8, 8)

@@ -1,7 +1,7 @@
 --!strict
 -- Map integrity & soft-lock prevention.
---   1. Every part tagged PhishWaterZone gets CanCollide=true so players can't
---      phase through the surface and die in the void below.
+--   1. Every part tagged PhishWaterZone stays non-collide so players can swim
+--      through the surface instead of walking on it.
 --   2. Snapshots the boat (and dock parts) at boot. On every player respawn
 --      / leave, restores them to the snapshot. Prevents the softlock where
 --      a drifted boat is unreachable from the lodge spawn.
@@ -18,26 +18,26 @@ local WATER_TAG = PhishConstants.Tags.WaterZone
 local BOAT_HULL_TAG = PhishConstants.Tags.BoatHull
 
 -- ---------------------------------------------------------------------------
--- 1. Make water tiles solid.
+-- 1. Keep water tiles non-collide.
 -- ---------------------------------------------------------------------------
 
-local function solidifyWaterPart(instance: Instance)
+local function makeWaterNonCollide(instance: Instance)
 	if not instance:IsA("BasePart") then return end
-	-- Anchored, walkable. We don't change Anchored or Transparency — only
-	-- collision. The map keeps its visual look.
-	instance.CanCollide = true
+	-- The client swim controller supplies buoyancy; collision here would make
+	-- the water behave like a floor.
+	instance.CanCollide = false
 end
 
-local function solidifyAllWater()
+local function makeAllWaterNonCollide()
 	local count = 0
 	for _, part in ipairs(CollectionService:GetTagged(WATER_TAG)) do
-		if part:IsA("BasePart") and not part.CanCollide then
-			part.CanCollide = true
+		if part:IsA("BasePart") and part.CanCollide then
+			part.CanCollide = false
 			count += 1
 		end
 	end
 	if count > 0 then
-		print(("[PHISH] MapIntegrity: solidified %d water tile(s)."):format(count))
+		print(("[PHISH] MapIntegrity: made %d water tile(s) non-collide."):format(count))
 	end
 end
 
@@ -138,9 +138,9 @@ end
 -- ---------------------------------------------------------------------------
 
 function MapIntegrityService.Init()
-	solidifyAllWater()
+	makeAllWaterNonCollide()
 	-- Catch any tile added later (e.g. live editing, deferred map gen).
-	CollectionService:GetInstanceAddedSignal(WATER_TAG):Connect(solidifyWaterPart)
+	CollectionService:GetInstanceAddedSignal(WATER_TAG):Connect(makeWaterNonCollide)
 
 	takeSnapshots()
 
