@@ -238,6 +238,8 @@ local function buildCard(payload: PopupPayload): Frame
 	root.BackgroundTransparency = 1
 	root.ZIndex = 50
 	root.Parent = screen
+	-- Render at 60% so the call card doesn't dominate the screen.
+	UIStyle.ApplyScale(root, 0.6)
 
 	buildBanner(root, payload.variant)
 	buildArt(root, payload.id)
