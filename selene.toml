@@ -1,1 +1,7 @@
 std = "roblox"
+
+[lints]
+# One-liner `if x then y end` guards and `pcall(function() ... end)` are
+# common in this codebase. Allow them to keep cast/bite/decision pipelines
+# compact.
+multiple_statements = "allow"
