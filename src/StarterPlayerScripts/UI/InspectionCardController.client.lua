@@ -35,6 +35,13 @@ local function colorAvatar(color: Color3?): Color3
 	return color or Color3.fromRGB(120, 120, 120)
 end
 
+local function avatarImage(sender: any): string?
+	if type(sender) ~= "table" or type(sender.avatarImage) ~= "string" or sender.avatarImage == "" then
+		return nil
+	end
+	return sender.avatarImage
+end
+
 local CARD_WIDTH_FRACTION = 0.46     -- of screen width
 local CARD_HEIGHT_FRACTION = 0.78    -- of screen height
 local CARD_MIN_WIDTH = 460
@@ -218,8 +225,21 @@ local function renderCard(card: any)
 	avatar.Position = UDim2.fromOffset(0, 4)
 	avatar.BackgroundColor3 = colorAvatar(card.sender and card.sender.avatarColor)
 	avatar.BorderSizePixel = 0
+	avatar.ClipsDescendants = true
 	avatar.Parent = senderRow
 	UIStyle.ApplyCorner(avatar, UDim.new(1, 0))
+
+	local image = avatarImage(card.sender)
+	if image then
+		local avatarIcon = Instance.new("ImageLabel")
+		avatarIcon.Name = "AvatarImage"
+		avatarIcon.Size = UDim2.fromScale(1, 1)
+		avatarIcon.BackgroundTransparency = 1
+		avatarIcon.Image = image
+		avatarIcon.ScaleType = Enum.ScaleType.Crop
+		avatarIcon.Parent = avatar
+		UIStyle.ApplyCorner(avatarIcon, UDim.new(1, 0))
+	end
 
 	local senderName = UIStyle.MakeLabel({
 		Size = UDim2.new(1, -64, 0, 24),

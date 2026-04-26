@@ -257,6 +257,25 @@ local function buildDock(map)
 		CFrame = CF(35, 1.4, 4),
 	})
 
+	-- Swim escape ramps. These make it possible to walk back onto the dock
+	-- from non-colliding water without needing a perfect jump.
+	mkPart("DockRampNorth", dock, {
+		Size = V3(6, 0.35, 4), Color = WOOD, Material = Enum.Material.WoodPlanks,
+		CFrame = CF(27, 0.75, -4.4) * CFrame.Angles(math.rad(-18), 0, 0),
+	})
+	mkPart("DockRampSouth", dock, {
+		Size = V3(6, 0.35, 4), Color = WOOD, Material = Enum.Material.WoodPlanks,
+		CFrame = CF(27, 0.75, 4.4) * CFrame.Angles(math.rad(18), 0, 0),
+	})
+	mkPart("DockTipRamp", dock, {
+		Size = V3(5, 0.35, 4), Color = WOOD, Material = Enum.Material.WoodPlanks,
+		CFrame = CF(35.2, 0.8, 0) * CFrame.Angles(0, 0, math.rad(-18)),
+	})
+	mkPart("BeachRamp", dock, {
+		Size = V3(10, 0.35, 7), Color = C3(194, 144, 86), Material = Enum.Material.WoodPlanks,
+		CFrame = CF(7.4, 0.65, 0) * CFrame.Angles(0, 0, math.rad(-16)),
+	})
+
 	-- Cast zones at the water-facing tip (3 of them spread across the tip)
 	for i = 1, 3 do
 		local zone = mkPart("CastZone_" .. i, dock, {

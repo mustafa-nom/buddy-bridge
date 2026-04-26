@@ -17,6 +17,7 @@ local MapIntegrityService = {}
 local WATER_TAG = PhishConstants.Tags.WaterZone
 local BOAT_HULL_TAG = PhishConstants.Tags.BoatHull
 local BOAT_SEAT_TAG = PhishConstants.Tags.BoatSeat
+local ESCAPE_FOLDER_NAME = "PhishWaterEscapeRamps"
 
 -- ---------------------------------------------------------------------------
 -- 1. Keep water tiles non-collide.
@@ -53,6 +54,51 @@ local function hideAllVehicleSeatHuds()
 	for _, seat in ipairs(CollectionService:GetTagged(BOAT_SEAT_TAG)) do
 		hideVehicleSeatHud(seat)
 	end
+end
+
+-- ---------------------------------------------------------------------------
+-- 1b. Escape ramps so swimmers can climb back onto dock/land.
+-- ---------------------------------------------------------------------------
+
+local function makeRamp(parent: Instance, name: string, size: Vector3, cframe: CFrame)
+	local ramp = Instance.new("Part")
+	ramp.Name = name
+	ramp.Anchored = true
+	ramp.CanCollide = true
+	ramp.TopSurface = Enum.SurfaceType.Smooth
+	ramp.BottomSurface = Enum.SurfaceType.Smooth
+	ramp.Material = Enum.Material.WoodPlanks
+	ramp.Color = Color3.fromRGB(132, 88, 54)
+	ramp.Size = size
+	ramp.CFrame = cframe
+	ramp.Parent = parent
+	return ramp
+end
+
+local function ensureEscapeRamps()
+	local map = workspace:FindFirstChild("PhishMap")
+	if not map then return end
+
+	local existing = map:FindFirstChild(ESCAPE_FOLDER_NAME)
+	if existing then existing:Destroy() end
+
+	local folder = Instance.new("Folder")
+	folder.Name = ESCAPE_FOLDER_NAME
+	folder.Parent = map
+
+	-- Dock ladders/ramps on both sides near the fishing area. They start just
+	-- below the swim surface and end at dock height, so players can walk up
+	-- instead of jumping against a vertical dock edge.
+	makeRamp(folder, "DockRampNorth", Vector3.new(6, 0.35, 4),
+		CFrame.new(27, 0.75, -4.4) * CFrame.Angles(math.rad(-18), 0, 0))
+	makeRamp(folder, "DockRampSouth", Vector3.new(6, 0.35, 4),
+		CFrame.new(27, 0.75, 4.4) * CFrame.Angles(math.rad(18), 0, 0))
+	makeRamp(folder, "DockTipRamp", Vector3.new(5, 0.35, 4),
+		CFrame.new(35.2, 0.8, 0) * CFrame.Angles(0, 0, math.rad(-18)))
+
+	-- Wider beach ramp back to the island path.
+	makeRamp(folder, "BeachRamp", Vector3.new(10, 0.35, 7),
+		CFrame.new(7.4, 0.65, 0) * CFrame.Angles(0, 0, math.rad(-16)))
 end
 
 -- ---------------------------------------------------------------------------
@@ -155,6 +201,7 @@ function MapIntegrityService.Init()
 	makeAllWaterNonCollide()
 	-- Catch any tile added later (e.g. live editing, deferred map gen).
 	CollectionService:GetInstanceAddedSignal(WATER_TAG):Connect(makeWaterNonCollide)
+	ensureEscapeRamps()
 	hideAllVehicleSeatHuds()
 	CollectionService:GetInstanceAddedSignal(BOAT_SEAT_TAG):Connect(hideVehicleSeatHud)
 
