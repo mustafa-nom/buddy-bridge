@@ -578,7 +578,7 @@ local function buildHeroCard(parent: Instance, rod: RodCatalog.Rod): Frame
 	-- Big name, gold ("ASTRAL ROD" style).
 	UIStyle.MakeLabel({
 		Size = UDim2.new(1, -16, 0, 32),
-		Position = UDim2.new(0, 8, 1, -128),
+		Position = UDim2.new(0, 8, 1, -164),
 		Text = string.upper(rod.name),
 		Font = UIStyle.FontDisplay,
 		TextSize = 26,
@@ -587,8 +587,8 @@ local function buildHeroCard(parent: Instance, rod: RodCatalog.Rod): Frame
 	})
 
 	UIStyle.MakeLabel({
-		Size = UDim2.new(1, -24, 0, 26),
-		Position = UDim2.new(0, 12, 1, -100),
+		Size = UDim2.new(1, -24, 0, 30),
+		Position = UDim2.new(0, 12, 1, -126),
 		Text = rod.description,
 		TextSize = UIStyle.TextSize.Caption,
 		TextColor3 = UIStyle.Palette.TextMuted,
@@ -802,11 +802,11 @@ local function openShop()
 		Name = "ShopPanel",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(880, 500),
+		Size = UDim2.fromOffset(980, 560),
 		BackgroundColor3 = UIStyle.Palette.Panel,
 		Parent = shopGui,
 	})
-	UIStyle.ApplyScale(panel, 0.7)
+	UIStyle.ApplyScale(panel, 0.78)
 
 	-- Banner title — rectangular cream/orange, overhangs the top edge.
 	UIStyle.BannerTitle({
@@ -977,14 +977,14 @@ local function openShop()
 		heroCol.Name = "HeroCol"
 		heroCol.AnchorPoint = Vector2.new(1, 0)
 		heroCol.Position = UDim2.new(1, 0, 0, 0)
-		heroCol.Size = UDim2.new(0, 260, 1, 0)
+		heroCol.Size = UDim2.new(0, 300, 1, 0)
 		heroCol.BackgroundTransparency = 1
 		heroCol.Parent = content
 		buildHeroCard(heroCol, heroRod)
 
 		local gridCol = Instance.new("Frame")
 		gridCol.Name = "GridCol"
-		gridCol.Size = UDim2.new(1, -276, 1, 0)
+		gridCol.Size = UDim2.new(1, -316, 1, 0)
 		gridCol.BackgroundTransparency = 1
 		gridCol.Parent = content
 
