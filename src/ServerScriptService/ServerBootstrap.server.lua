@@ -18,6 +18,10 @@ end
 
 local DataService = load("DataService")
 local PondService = load("PondService")
+local BobberService = load("BobberService")
+local StreakService = load("StreakService")
+local AnnouncementService = load("AnnouncementService")
+local ReelMinigameService = load("ReelMinigameService")
 local CastingService = load("CastingService")
 local BiteService = load("BiteService")
 local FieldGuideService = load("FieldGuideService")
@@ -31,6 +35,10 @@ local RowboatService = load("RowboatService")
 
 DataService.Init()
 PondService.Init()
+BobberService.Init()
+StreakService.Init()
+AnnouncementService.Init()
+ReelMinigameService.Init()
 CastingService.Init()
 BiteService.Init()
 FieldGuideService.Init()
@@ -42,7 +50,6 @@ ShopService.Init()
 SellService.Init()
 RowboatService.Init()
 
--- Startup diagnostics: how many of each expected tag did the map deliver?
 local function diag()
 	local lines = { "[PHISH!] Map diagnostics:" }
 	for label, tag in pairs(Constants.TAGS) do
@@ -52,6 +59,5 @@ local function diag()
 	print(table.concat(lines, "\n"))
 end
 
--- Defer to give Studio-built tags a tick to register.
 task.delay(1, diag)
 print("[PHISH!] Server services initialized.")

@@ -19,6 +19,7 @@ local Helpers = Services:WaitForChild("Helpers")
 local RemoteValidation = require(Helpers:WaitForChild("RemoteValidation"))
 local DataService = require(Services:WaitForChild("DataService"))
 local PondService = require(Services:WaitForChild("PondService"))
+local BobberService = require(Services:WaitForChild("BobberService"))
 
 local CastingService = {}
 
@@ -84,6 +85,8 @@ local function handleRequestCast(player: Player, payload: any)
 
 	local enc = PondStateModule.New(player, zoneInfo.zoneId, zoneInfo.tier, equippedRodId)
 	enc.state = FishEncounterTypes.States.Waiting
+	-- Lucky-bobber roll: small chance the cast surfaces a glittery lure.
+	enc.luckyBobber = math.random() < Constants.LUCKY_BOBBER_CHANCE
 	activeEncounter[player] = enc
 
 	-- Sanitize payload (chargePower used as cosmetic only).
@@ -92,6 +95,15 @@ local function handleRequestCast(player: Player, payload: any)
 		chargePower = math.clamp(payload.chargePower, 0, 1)
 	end
 	local _ = chargePower
+
+	-- Diegetic bobber. Initial color is generic until bite resolves the cue.
+	BobberService.SpawnFor(player, Color3.fromRGB(255, 220, 160), enc.luckyBobber)
+	if enc.luckyBobber then
+		RemoteService.FireClient(player, "LuckyBobberCue", {
+			EncounterId = enc.encounterId,
+			Multiplier = Constants.LUCKY_BOBBER_MULTIPLIER,
+		})
+	end
 
 	if biteScheduler then
 		biteScheduler(player, enc)

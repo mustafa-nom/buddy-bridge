@@ -15,6 +15,8 @@ local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 
 local Services = script.Parent
 local CastingService = require(Services:WaitForChild("CastingService"))
+local BobberService = require(Services:WaitForChild("BobberService"))
+local StreakService = require(Services:WaitForChild("StreakService"))
 
 local BiteService = {}
 
@@ -58,12 +60,16 @@ local function scheduleBite(player: Player, enc)
 		enc.bitedAt = os.clock()
 		enc.state = FishEncounterTypes.States.BitePending
 
+		BobberService.SetCue(player, fish.bobberCue.color, fish.bobberCue.ripple)
 		RemoteService.FireClient(player, "BiteOccurred", {
 			EncounterId = enc.encounterId,
 			BobberColor = fish.bobberCue.color,
 			Ripple = fish.bobberCue.ripple,
+			Rarity = fish.rarity,
+			Category = fish.category,
 			DecisionWindowSec = Constants.DECISION_WINDOW_SECONDS,
 			ZoneTier = enc.zoneTier,
+			LuckyBobber = enc.luckyBobber == true,
 		})
 
 		-- Decision-window expiry: fish escapes if no action.
@@ -75,6 +81,8 @@ local function scheduleBite(player: Player, enc)
 				enc.state = FishEncounterTypes.States.Resolved
 				enc.resolvedAt = os.clock()
 				CastingService.SetEncounter(player, nil)
+				BobberService.Despawn(player)
+				StreakService.RegisterWrong(player)
 				RemoteService.FireClient(player, "CatchResolved", {
 					EncounterId = enc.encounterId,
 					FishId = fish.id,
@@ -83,9 +91,10 @@ local function scheduleBite(player: Player, enc)
 					Rarity = fish.rarity,
 					WasCorrect = false,
 					Outcome = FishEncounterTypes.OutcomeKinds.Escaped,
-					LessonLine = "It slipped away. Try the rod next time.",
+					LessonLine = "It slipped away. Set the hook quicker next time.",
 					Pearls = 0,
 					Xp = 0,
+					Streak = 0,
 				})
 			end
 		end)
