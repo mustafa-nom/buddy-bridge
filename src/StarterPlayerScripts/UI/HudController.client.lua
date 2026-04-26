@@ -69,3 +69,47 @@ RemoteService.OnClientEvent("SpeciesUnlocked", function(payload)
 	if type(payload) ~= "table" then return end
 	UIBuilder.Toast("New dex entry: " .. (payload.displayName or ""), 5, "Success")
 end)
+
+-- Tutorial nudge: a richer one-shot card with title + body + auto-dismiss.
+local function showNudge(payload: any)
+	if type(payload) ~= "table" then return end
+	local old = screen:FindFirstChild("PhishTutorialNudge")
+	if old then old:Destroy() end
+	local card = UIStyle.MakePanel({
+		Name = "PhishTutorialNudge",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 80),
+		Size = UDim2.fromOffset(440, 110),
+		BackgroundColor3 = UIStyle.Palette.AskFirst,
+	})
+	card.Parent = screen
+	UIStyle.MakeLabel({
+		Size = UDim2.new(1, -24, 0, 28), Position = UDim2.fromOffset(12, 8),
+		Text = "💡 " .. (payload.title or "Tip"),
+		Font = UIStyle.FontBold, TextSize = UIStyle.TextSize.Heading,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = card,
+	})
+	UIStyle.MakeLabel({
+		Size = UDim2.new(1, -24, 0, 60), Position = UDim2.fromOffset(12, 40),
+		Text = payload.text or "",
+		TextSize = UIStyle.TextSize.Body, TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
+		Parent = card,
+	})
+	task.delay(payload.durationSec or 6, function()
+		if card and card.Parent then card:Destroy() end
+	end)
+end
+RemoteService.OnClientEvent("TutorialNudge", showNudge)
+
+-- CastStarted: server confirmed the cast. Play a quick local SFX so the
+-- input feels acknowledged. (Sound stays unloaded if asset id is missing.)
+local castSound = Instance.new("Sound")
+castSound.Name = "CastWhoosh"
+castSound.SoundId = "rbxassetid://9114143000"  -- placeholder — swap when real sfx lands
+castSound.Volume = 0.4
+castSound.Parent = script
+RemoteService.OnClientEvent("CastStarted", function()
+	pcall(function() castSound:Play() end)
+end)
