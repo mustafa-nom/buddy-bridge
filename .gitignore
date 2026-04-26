@@ -19,6 +19,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Local scratch (screenshots, throwaway notes)
+_temp/
+
 # Roblox-ts / Wally (if added later)
 node_modules/
 Packages/
