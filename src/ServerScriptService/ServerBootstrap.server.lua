@@ -1,11 +1,13 @@
 --!strict
--- Server-side init. Requires every service in dependency order and calls
--- Init() once.
+-- Server-side init for PHISH!. Requires every service in dependency order
+-- and prints a tag-count diagnostics report so the team can spot missing
+-- map handoffs at boot.
 
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
+local Constants = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Constants"))
 
--- Create remotes first; everything else relies on them.
 RemoteService.Init()
 
 local ServicesFolder = script.Parent:WaitForChild("Services")
@@ -14,46 +16,42 @@ local function load(name: string)
 	return require(ServicesFolder:WaitForChild(name))
 end
 
-local MatchService = load("MatchService")
-local LobbyService = load("LobbyService")
-local RoleService = load("RoleService")
-local ScoringService = load("ScoringService")
-local PlayAreaService = load("PlayAreaService")
-local ScenarioService = load("ScenarioService")
-local LevelService = load("LevelService")
-local RoundService = load("RoundService")
-local GuideControlService = load("GuideControlService")
-local ScannerService = load("ScannerService")
-local ExplorerInteractionService = load("ExplorerInteractionService")
 local DataService = load("DataService")
+local PondService = load("PondService")
+local CastingService = load("CastingService")
+local BiteService = load("BiteService")
+local FieldGuideService = load("FieldGuideService")
+local JournalService = load("JournalService")
+local AquariumService = load("AquariumService")
 local RewardService = load("RewardService")
-local AnalyticsService = load("AnalyticsService")
+local CatchResolutionService = load("CatchResolutionService")
+local ShopService = load("ShopService")
+local SellService = load("SellService")
+local RowboatService = load("RowboatService")
 
-MatchService.Init()
-LobbyService.Init()
-RoleService.Init()
-ScoringService.Init()
-PlayAreaService.Init()
-ScenarioService.Init()
-LevelService.Init()
-
--- Wire reward handler before round service starts dispatching.
-RoundService.SetRewardHandler(function(round, finalScore)
-	return RewardService.GrantRunRewards(round, finalScore)
-end)
-
-RoundService.Init()
-GuideControlService.Init()
-ScannerService.Init()
-ExplorerInteractionService.Init()
 DataService.Init()
+PondService.Init()
+CastingService.Init()
+BiteService.Init()
+FieldGuideService.Init()
+JournalService.Init()
+AquariumService.Init()
 RewardService.Init()
-AnalyticsService.Init()
+CatchResolutionService.Init()
+ShopService.Init()
+SellService.Init()
+RowboatService.Init()
 
--- When a pair is created (capsule confirm or invite accept), kick off
--- role-select with the auto-assign timer.
-MatchService.OnPairCreated(function(pair)
-	RoleService.HandlePairAssigned(pair)
-end)
+-- Startup diagnostics: how many of each expected tag did the map deliver?
+local function diag()
+	local lines = { "[PHISH!] Map diagnostics:" }
+	for label, tag in pairs(Constants.TAGS) do
+		local n = #CollectionService:GetTagged(tag)
+		table.insert(lines, ("  %s (%s): %d"):format(label, tag, n))
+	end
+	print(table.concat(lines, "\n"))
+end
 
-print("[BuddyBridge] Server services initialized.")
+-- Defer to give Studio-built tags a tick to register.
+task.delay(1, diag)
+print("[PHISH!] Server services initialized.")
