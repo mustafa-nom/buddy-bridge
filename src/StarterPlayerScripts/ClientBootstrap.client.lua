@@ -1,33 +1,29 @@
 --!strict
--- Client init. The other controllers are LocalScripts that auto-start; this
--- bootstrap exists to:
---   * make sure the remote folder is replicated before any controller fires
---   * create the shared ScreenGui parent
---   * acknowledge progression on join
+-- PHISH client init. Ensures the remote folder + ScreenGui exist before any
+-- controller mounts, then warms the player snapshot so HUD has data on join.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 
+local Constants = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Constants"))
+
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Wait for the remote folder so other controllers don't race.
-ReplicatedStorage:WaitForChild("BuddyBridgeRemotes")
+ReplicatedStorage:WaitForChild(Constants.REMOTE_FOLDER_NAME)
 
--- Shared ScreenGui that every UI controller mounts under.
-local screen = playerGui:FindFirstChild("BuddyBridgeUI")
+local screen = playerGui:FindFirstChild(Constants.SCREEN_GUI_NAME)
 if not screen then
 	screen = Instance.new("ScreenGui")
-	screen.Name = "BuddyBridgeUI"
+	screen.Name = Constants.SCREEN_GUI_NAME
 	screen.ResetOnSpawn = false
 	screen.IgnoreGuiInset = false
 	screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screen.Parent = playerGui
-else
-	screen.IgnoreGuiInset = false
 end
 
+-- Touch the remote so it loads in the cache; controllers will reuse it.
 local _ = RemoteService
 
-print("[BuddyBridge] Client bootstrap ready.")
+print("[PHISH] Client bootstrap ready.")

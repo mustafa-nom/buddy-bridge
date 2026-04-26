@@ -1,1 +1,6 @@
 std = "roblox"
+
+# Inline `if X then Y end` is allowed throughout PHISH services for compact
+# guard clauses. Selene's default flags every one as `multiple_statements`.
+[lints]
+multiple_statements = "allow"

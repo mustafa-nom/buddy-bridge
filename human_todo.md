@@ -9,6 +9,22 @@ The prior Buddy Bridge `human_todo.md` lived here; check git history if you need
 - [ ] `aftman install` — installs Rojo 7.7.0-rc.1 and Selene 0.27.1 from `aftman.toml`
 - [ ] Verify `rojo --version` and `selene --version` work in this repo's terminal
 - [ ] Install Rojo Studio plugin (if not already), connect to `rojo serve`
+- [ ] **Install + activate the Roblox MCP Studio plugin.** The map agent (User 1 / Claude) cannot build the map without it. Symptom when down: every `mcp__robloxstudio__*` call returns `Studio plugin connection timeout`.
+
+## Build the PHISH! map (one-shot, Studio Command Bar)
+
+The User 1 / Claude agent has staged the entire map build into two Luau scripts under `studio_scripts/`. If the Roblox MCP plugin isn't connected, run them by hand:
+
+1. Open Studio. `View` → `Command Bar` (toggles a Lua input at the bottom).
+2. Open `studio_scripts/build_phish_world.luau` in any editor. Copy the entire file. Paste into the Command Bar. Press Enter.
+   - Expect: `[PHISH! WORLD] Done. WaterTiles=~119. Run build_phish_templates.luau next.`
+   - Result: `Workspace.PhishMap` populated with island, lodge, dock, water grid, boat, two shops.
+3. Repeat with `studio_scripts/build_phish_templates.luau`.
+   - Expect: `[PHISH! TEMPLATES] Done. Fish=12 Bobbers=4 Lures=1`
+   - Result: `ServerStorage.PhishFishTemplates`, `.PhishBobbers`, `.PhishLures` populated.
+4. Save the place file (`File` → `Save to File As…` if not already saved).
+
+Both scripts are idempotent — re-run any time after edits. They wipe and rebuild their own scope.
 
 ## Lodge (lobby) — Studio-built
 

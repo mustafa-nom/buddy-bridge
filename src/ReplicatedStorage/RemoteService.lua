@@ -1,97 +1,47 @@
 --!strict
--- Single source for every RemoteEvent / RemoteFunction in the project.
--- Every other service or controller MUST go through this module — never
--- create remotes ad-hoc or look them up by path.
+-- Single source for every RemoteEvent / RemoteFunction in PHISH. Every
+-- service or controller MUST go through this module.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local Modules = ReplicatedStorage:WaitForChild("Modules")
-local Constants = require(Modules:WaitForChild("Constants"))
+local Constants = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Constants"))
 
 local RemoteService = {}
 
--- Two flat lists — the canonical contract. Adding a remote means adding it
--- here. Type ("Event" | "Function") is implicit from the table.
-
 RemoteService.Events = {
 	-- Client → Server
-	"RequestPairFromCapsule",
-	"RequestInvitePlayer",
-	"RespondToInvite",
-	"LeavePair",
-	"SelectRole",
-	"StartRound",
-	"RequestInspectNpc",
-	"RequestNpcDialogChoice",
-	"RequestPickupItem",
-	"RequestPlaceItemInLane",
-	"RequestSetSlotBadge",
-	"RequestSubmitAccusation",
-	"RequestScanItem",        -- Backpack Checkpoint Active Scanner Guide
-	"RequestHighlightItem",   -- Backpack Checkpoint Active Scanner Guide
-	"RequestUnlockLane",      -- Backpack Checkpoint Active Scanner Guide
-	"RequestVeto",            -- Backpack Checkpoint Veto button
-	"RequestDismissIntro",    -- Pixel Post intro slide dismiss
-	"ReturnToLobby",
+	"RequestRod",            -- player taps NPC ProximityPrompt to receive rod tool
+	"RequestCast",           -- player throws lure ({ aimPos = Vector3 })
+	"RequestReelTap",        -- player taps during reel mini-game
+	"SubmitDecision",        -- KEEP / CUT_BAIT ({ decision = "KEEP" | "CUT_BAIT" })
+	"RequestOpenPhishDex",   -- player opens dex screen
 
 	-- Server → Client
-	"InviteReceived",
-	"CapsulePairReady",
-	"CapsulePairCleared",
-	"PairAssigned",
-	"PairCleared",
-	"RoleAssigned",
-	"RoundStarted",
-	"RoundEnded",
-	"RoundStateUpdated",
-	"LevelStarted",
-	"LevelEnded",
-	"OpenNpcDialog",
-	"NpcDialogNoteAdded",
-	"OpenSlotPicker",
-	"BoothStateUpdated",
-	"ConveyorItemSpawned",
-	"ConveyorItemRemoved",
-	"ItemSortResult",
-	"ItemFalloff",            -- item fell off belt edge — counts as a mistake
-	"GuideManualUpdated",
-	"ExplorerFeedback",
-	"ScoreUpdated",
-	"ShowScoreScreen",
-	"RewardGranted",
-	"ProgressionUpdated",
-	"Notify",
-	"SetHudMode",
-	-- Backpack Checkpoint Active Scanner Guide
-	"BeltStateUpdated",       -- multi-item belt snapshot to Guide HUD
-	"ScannerOverlayUpdated",  -- Scan reveal payload (tags) to Guide HUD
-	"HighlightUpdated",       -- ring color update visible to both players
-	"LaneLockUpdated",        -- per-item lane lock state for Explorer
-	"WaveStarted",
-	"WaveEnded",
-	"PixelPostIntro",         -- intro slide payload (title, body)
-	"VetoActivated",          -- veto button pressed; belt frozen for N seconds
-	"VetoEnded",              -- veto freeze expired; lanes re-armable
-	"MiniBossStarted",        -- VIP bag arrived; belt halted
-	"MiniBossInnerActivated", -- next inner item is now active
-	"MiniBossEnded",          -- bag fully resolved or round-failed
-	"TutorialPrompt",         -- first-time tutorial overlay payload
-	"FieldManualUpdated",     -- Field Manual seen-set delta or snapshot
+	"RodGranted",            -- ack that rod is in player's backpack
+	"BiteOccurred",          -- bite has happened, start reel mini-game (payload: { tapsRequired, windowSeconds })
+	"ReelProgress",          -- per-tap progress update
+	"ReelFailed",            -- player ran out of taps / time, fish escaped
+	"ShowInspectionCard",    -- card data minus isLegit/species/redFlags (see DecisionService)
+	"DecisionResult",        -- decision outcome + species + flags + rewards
+	"HudUpdated",            -- coins / accuracy / role / xp
+	"SpeciesUnlocked",       -- toast: new dex entry unlocked
+	"PhishermanArrived",     -- boss event start
+	"PhishermanDefeated",    -- boss event end
+	"LeaderboardUpdated",    -- snapshot for Board of Fame
+	"Notify",                -- generic toast
 }
 
 RemoteService.Functions = {
-	"GetCurrentRoundState",
-	"GetProgression",
+	"GetPlayerSnapshot",     -- coins, accuracy, role, unlockedSpecies — for HUD/dex on join
+	"GetPhishDex",           -- whole dex (for client-side dex UI)
 }
 
 local remoteFolder: Folder? = nil
 local instances: { [string]: Instance } = {}
 
 local function ensureFolder(): Folder
-	if remoteFolder and remoteFolder.Parent then
-		return remoteFolder
-	end
+	if remoteFolder and remoteFolder.Parent then return remoteFolder end
 	local existing = ReplicatedStorage:FindFirstChild(Constants.REMOTE_FOLDER_NAME)
 	if existing then
 		remoteFolder = existing :: Folder
@@ -104,7 +54,6 @@ local function ensureFolder(): Folder
 		remoteFolder = folder
 		return folder
 	end
-	-- Client: wait for the folder.
 	local folder = ReplicatedStorage:WaitForChild(Constants.REMOTE_FOLDER_NAME, 30)
 	assert(folder and folder:IsA("Folder"), "RemoteService: missing remotes folder")
 	remoteFolder = folder :: Folder
@@ -112,13 +61,11 @@ local function ensureFolder(): Folder
 end
 
 local function ensureRemote(name: string, className: string): Instance
-	if instances[name] then
-		return instances[name]
-	end
+	if instances[name] then return instances[name] end
 	local folder = ensureFolder()
 	local existing = folder:FindFirstChild(name)
 	if existing then
-		assert(existing.ClassName == className, "RemoteService: remote " .. name .. " has wrong class")
+		assert(existing.ClassName == className, "RemoteService: " .. name .. " has wrong class")
 		instances[name] = existing
 		return existing
 	end
@@ -129,25 +76,17 @@ local function ensureRemote(name: string, className: string): Instance
 		instances[name] = remote
 		return remote
 	end
-	-- Client: wait for the remote.
 	local remote = folder:WaitForChild(name, 30)
-	assert(remote and remote.ClassName == className, "RemoteService: missing remote " .. name)
+	assert(remote and remote.ClassName == className, "RemoteService: missing " .. name)
 	instances[name] = remote
 	return remote
 end
 
--- Server: create every declared remote. Idempotent.
 function RemoteService.Init()
-	if not RunService:IsServer() then
-		return
-	end
+	if not RunService:IsServer() then return end
 	ensureFolder()
-	for _, name in ipairs(RemoteService.Events) do
-		ensureRemote(name, "RemoteEvent")
-	end
-	for _, name in ipairs(RemoteService.Functions) do
-		ensureRemote(name, "RemoteFunction")
-	end
+	for _, name in ipairs(RemoteService.Events) do ensureRemote(name, "RemoteEvent") end
+	for _, name in ipairs(RemoteService.Functions) do ensureRemote(name, "RemoteFunction") end
 end
 
 function RemoteService.GetEvent(name: string): RemoteEvent
@@ -158,58 +97,39 @@ function RemoteService.GetFunction(name: string): RemoteFunction
 	return ensureRemote(name, "RemoteFunction") :: RemoteFunction
 end
 
--- Server-only: fire one client.
 function RemoteService.FireClient(player: Player, name: string, ...)
 	assert(RunService:IsServer(), "FireClient is server-only")
-	local event = RemoteService.GetEvent(name)
-	event:FireClient(player, ...)
+	RemoteService.GetEvent(name):FireClient(player, ...)
 end
 
--- Server-only: fire both members of a round (Explorer + Guide). This is the
--- preferred path for any round-state event so we never accidentally
--- broadcast to other duos.
-function RemoteService.FirePair(round: any, name: string, ...)
-	assert(RunService:IsServer(), "FirePair is server-only")
-	local event = RemoteService.GetEvent(name)
-	if round.Explorer and round.Explorer.Parent then
-		event:FireClient(round.Explorer, ...)
-	end
-	if round.Guide and round.Guide.Parent then
-		event:FireClient(round.Guide, ...)
-	end
+function RemoteService.FireAllClients(name: string, ...)
+	assert(RunService:IsServer(), "FireAllClients is server-only")
+	RemoteService.GetEvent(name):FireAllClients(...)
 end
 
--- Server-only: connect a server-side handler.
 function RemoteService.OnServerEvent(name: string, handler: (Player, ...any) -> ()): RBXScriptConnection
 	assert(RunService:IsServer(), "OnServerEvent is server-only")
-	local event = RemoteService.GetEvent(name)
-	return event.OnServerEvent:Connect(handler)
+	return RemoteService.GetEvent(name).OnServerEvent:Connect(handler)
 end
 
 function RemoteService.OnServerInvoke(name: string, handler: (Player, ...any) -> ...any)
 	assert(RunService:IsServer(), "OnServerInvoke is server-only")
-	local fn = RemoteService.GetFunction(name)
-	fn.OnServerInvoke = handler
+	RemoteService.GetFunction(name).OnServerInvoke = handler
 end
 
--- Client-only: connect a client-side handler.
 function RemoteService.OnClientEvent(name: string, handler: (...any) -> ()): RBXScriptConnection
 	assert(RunService:IsClient(), "OnClientEvent is client-only")
-	local event = RemoteService.GetEvent(name)
-	return event.OnClientEvent:Connect(handler)
+	return RemoteService.GetEvent(name).OnClientEvent:Connect(handler)
 end
 
--- Client-only: fire to server.
 function RemoteService.FireServer(name: string, ...)
 	assert(RunService:IsClient(), "FireServer is client-only")
-	local event = RemoteService.GetEvent(name)
-	event:FireServer(...)
+	RemoteService.GetEvent(name):FireServer(...)
 end
 
 function RemoteService.InvokeServer(name: string, ...): any
 	assert(RunService:IsClient(), "InvokeServer is client-only")
-	local fn = RemoteService.GetFunction(name)
-	return fn:InvokeServer(...)
+	return RemoteService.GetFunction(name):InvokeServer(...)
 end
 
 return RemoteService

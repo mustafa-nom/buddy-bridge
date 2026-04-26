@@ -4,7 +4,13 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 
 ## Project Overview
 
-**PHISH!** is a cozy fishing collection game for Roblox where every fish you reel in is a real online-safety moment in disguise. The internet is the ocean. Some catches are valuable. Some are bait. Some are scams. Some are kindness. The player becomes a **digital angler** who learns — through gameplay, not lectures — to spot phishing, scams, rumors, AI hallucinations, fake authority, and toxic messages, while collecting genuine kindness fish and accurate-info fish for their aquarium.
+**PHISH** — *"Spot the scam. Save the sea."* — is a Roblox MMO fishing game where the fish are scams disguised as messages. Cast a line, reel in a suspicious "card" via a rhythm mini-game, and decide: **KEEP** (legit) or **CUT BAIT** (phish). Players are anglers (not victims) who learn to spot phishing patterns by hunting them.
+
+**Canonical design lives in `docs/PHISH_PRD.md`.** That PRD supersedes the older "PHISH! 6-verb" docs (`GAMEDESIGN.md`, `PHISH_CORE_LOOP.md`, `PHISH_CONTENT.md`, `PHISH_MVP_PLAN.md`) — those are kept for reference but are NOT authoritative.
+
+Content sources:
+- `docs/PHISH_SCAM_CARDS.md` — 20 MVP scam cards (data for `ReplicatedStorage.ScamCards`).
+- `docs/PHISH_PHISH_DEX.md` — 6 species + 2 legit fish (data for `ReplicatedStorage.PhishDex`).
 
 The project was pivoted from a prior concept (**Buddy Bridge**) on 2026-04-25. All Buddy Bridge docs now live in `docs/archive/`. The git tag `pre-phish-pivot` preserves the previous state. The Lua source under `src/` still reflects Buddy Bridge — code conversion is a follow-up task tracked in `tasks/todo.md` (P1+P2).
 

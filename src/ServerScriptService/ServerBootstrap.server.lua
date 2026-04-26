@@ -1,59 +1,37 @@
 --!strict
--- Server-side init. Requires every service in dependency order and calls
--- Init() once.
+-- PHISH server init. Creates remotes, then requires + initializes every
+-- service in dependency order.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 
--- Create remotes first; everything else relies on them.
 RemoteService.Init()
 
 local ServicesFolder = script.Parent:WaitForChild("Services")
+local function load(name: string) return require(ServicesFolder:WaitForChild(name)) end
 
-local function load(name: string)
-	return require(ServicesFolder:WaitForChild(name))
-end
-
-local MatchService = load("MatchService")
-local LobbyService = load("LobbyService")
-local RoleService = load("RoleService")
-local ScoringService = load("ScoringService")
-local PlayAreaService = load("PlayAreaService")
-local ScenarioService = load("ScenarioService")
-local LevelService = load("LevelService")
-local RoundService = load("RoundService")
-local GuideControlService = load("GuideControlService")
-local ScannerService = load("ScannerService")
-local ExplorerInteractionService = load("ExplorerInteractionService")
 local DataService = load("DataService")
-local RewardService = load("RewardService")
+local ScoringService = load("ScoringService")
+local PhishDexService = load("PhishDexService")
+local CardService = load("CardService")
+local FishingService = load("FishingService")
+local DecisionService = load("DecisionService")
+local RodService = load("RodService")
+local RoleService = load("RoleService")
+local BossService = load("BossService")
+local LeaderboardService = load("LeaderboardService")
 local AnalyticsService = load("AnalyticsService")
 
-MatchService.Init()
-LobbyService.Init()
-RoleService.Init()
-ScoringService.Init()
-PlayAreaService.Init()
-ScenarioService.Init()
-LevelService.Init()
-
--- Wire reward handler before round service starts dispatching.
-RoundService.SetRewardHandler(function(round, finalScore)
-	return RewardService.GrantRunRewards(round, finalScore)
-end)
-
-RoundService.Init()
-GuideControlService.Init()
-ScannerService.Init()
-ExplorerInteractionService.Init()
 DataService.Init()
-RewardService.Init()
+ScoringService.Init()
+PhishDexService.Init()
+CardService.Init()
+FishingService.Init()
+DecisionService.Init()
+RodService.Init()
+RoleService.Init()
+BossService.Init()
+LeaderboardService.Init()
 AnalyticsService.Init()
 
--- When a pair is created (capsule confirm or invite accept), kick off
--- role-select with the auto-assign timer.
-MatchService.OnPairCreated(function(pair)
-	RoleService.HandlePairAssigned(pair)
-end)
-
-print("[BuddyBridge] Server services initialized.")
+print("[PHISH] Server services initialized.")

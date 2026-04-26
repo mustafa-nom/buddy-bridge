@@ -1,26 +1,38 @@
 --!strict
--- Tracks RBXScriptConnections against a Round's lifetime. Every server
--- service should route its connections through this so EndRound can reliably
--- clean up.
-
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RoundState = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("RoundState"))
-
-type Round = RoundState.Round
+-- Per-player connection registry. When a player leaves, every connection
+-- registered against them gets disconnected. Keeps services from leaking
+-- handlers across rejoins.
 
 local SignalTracker = {}
 
--- Connect `signal:Connect(handler)` and register the resulting connection
--- against the round so it disconnects on round end.
-function SignalTracker.Track(round: Round, signal: RBXScriptSignal, handler: (...any) -> ()): RBXScriptConnection
+local perPlayer: { [Player]: { RBXScriptConnection } } = {}
+
+local function bucket(player: Player): { RBXScriptConnection }
+	local list = perPlayer[player]
+	if not list then
+		list = {}
+		perPlayer[player] = list
+	end
+	return list
+end
+
+function SignalTracker.Track(player: Player, signal: RBXScriptSignal, handler: (...any) -> ()): RBXScriptConnection
 	local connection = signal:Connect(handler)
-	RoundState.AddConnection(round, connection)
+	table.insert(bucket(player), connection)
 	return connection
 end
 
--- Track an already-existing connection.
-function SignalTracker.Adopt(round: Round, connection: RBXScriptConnection)
-	RoundState.AddConnection(round, connection)
+function SignalTracker.Adopt(player: Player, connection: RBXScriptConnection)
+	table.insert(bucket(player), connection)
+end
+
+function SignalTracker.Cleanup(player: Player)
+	local list = perPlayer[player]
+	if not list then return end
+	for _, c in ipairs(list) do
+		if c.Connected then c:Disconnect() end
+	end
+	perPlayer[player] = nil
 end
 
 return SignalTracker
