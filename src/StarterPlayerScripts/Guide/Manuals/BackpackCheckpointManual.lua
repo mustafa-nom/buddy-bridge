@@ -12,6 +12,8 @@ local BackpackCheckpointManual = {}
 export type Manual = {
 	Frame: Frame,
 	Highlight: (self: any, itemKey: string) -> (),
+	MarkSeen: (self: any, itemKey: string) -> (),
+	MarkAllSeen: (self: any, set: { [string]: boolean }) -> (),
 	Destroy: (self: any) -> (),
 }
 
@@ -118,15 +120,41 @@ function BackpackCheckpointManual.Build(parent: Instance, manualPayload): Manual
 		end
 	end
 
+	-- Decorate each row with a "seen" indicator (a small bullet that turns
+	-- green once the duo has encountered that item this session).
+	local seenDots: { [string]: TextLabel } = {}
+	for key, row in pairs(allRows) do
+		local dot = UIStyle.MakeLabel({
+			Size = UDim2.new(0, 18, 1, 0),
+			Position = UDim2.new(1, -22, 0, 0),
+			Text = "•",
+			TextSize = UIStyle.TextSize.Heading,
+			TextColor3 = UIStyle.Palette.PanelStroke,
+		})
+		dot.Parent = row
+		seenDots[key] = dot
+	end
+
 	local manual = {} :: Manual
 	manual.Frame = frame
 	manual.Highlight = function(_self, itemKey: string)
-		for k, row in pairs(allRows) do
+		for _, row in pairs(allRows) do
 			row.BackgroundColor3 = UIStyle.Palette.Panel
 		end
 		local row = allRows[itemKey]
 		if row then
 			row.BackgroundColor3 = UIStyle.Palette.Highlight
+		end
+	end
+	manual.MarkSeen = function(_self, itemKey: string)
+		local dot = seenDots[itemKey]
+		if dot then
+			dot.TextColor3 = UIStyle.Palette.Safe
+		end
+	end
+	manual.MarkAllSeen = function(self, set: { [string]: boolean })
+		for key in pairs(set or {}) do
+			self:MarkSeen(key)
 		end
 	end
 	manual.Destroy = function(self)
