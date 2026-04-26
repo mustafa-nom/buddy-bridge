@@ -25,6 +25,14 @@ PhishConstants.REWARD_LEGIT_KEEP_COINS = 3
 PhishConstants.REWARD_WRONG_PENALTY_COINS = 0  -- never go negative for kids
 PhishConstants.REWARD_DIFFICULTY_BONUS = 5     -- +5 per difficulty tier above 1
 
+-- Red-flag annotations on the inspection email. Correct flags add an extra
+-- skill reward; wrong flags subtract coins so guessing has a cost.
+PhishConstants.FLAG_CORRECT_COINS = 2
+PhishConstants.FLAG_CORRECT_XP = 5
+PhishConstants.FLAG_FALSE_POSITIVE_COINS = 2
+PhishConstants.FLAG_FALSE_ALARM_COINS = 5
+PhishConstants.FLAG_MAX_PER_DECISION = 8
+
 -- Roles
 PhishConstants.COAST_GUARD_MIN_CATCHES = 50
 PhishConstants.COAST_GUARD_MIN_ACCURACY = 0.80

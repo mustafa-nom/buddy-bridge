@@ -82,6 +82,30 @@ local function render(payload: any)
 		y += 40
 	end
 
+	local flagsCorrect = #(payload.flagsCorrect or {})
+	local flagsFalse = #(payload.flagsFalse or {})
+	local flagBonusCoins = payload.flagBonusCoins or 0
+	local flagBonusXp = payload.flagBonusXp or 0
+	if flagsCorrect > 0 or flagsFalse > 0 or flagBonusCoins ~= 0 or flagBonusXp ~= 0 then
+		local summary = string.format("Red flag score: %d right, %d wrong", flagsCorrect, flagsFalse)
+		if flagBonusCoins ~= 0 then
+			summary ..= string.format("   Coins %+d", flagBonusCoins)
+		end
+		if flagBonusXp ~= 0 then
+			summary ..= string.format("   XP %+d", flagBonusXp)
+		end
+		UIStyle.MakeLabel({
+			Size = UDim2.new(1, -32, 0, 32),
+			Position = UDim2.fromOffset(16, math.min(y + 4, 292)),
+			Text = summary,
+			Font = UIStyle.FontBold,
+			TextSize = UIStyle.TextSize.Body,
+			TextColor3 = (flagsFalse > 0 and flagsCorrect == 0) and UIStyle.Palette.Risky or UIStyle.Palette.Safe,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextWrapped = true,
+		}).Parent = panel
+	end
+
 	-- Reward chip
 	local rewardText = ""
 	if (payload.coinsDelta or 0) ~= 0 then

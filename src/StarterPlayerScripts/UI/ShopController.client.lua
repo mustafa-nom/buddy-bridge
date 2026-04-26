@@ -8,6 +8,7 @@ local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local Modules = ReplicatedStorage:WaitForChild("Modules")
 local PhishConstants = require(Modules:WaitForChild("PhishConstants"))
@@ -102,9 +103,11 @@ local function refreshAll()
 end
 
 local function buildRodCard(parent: Instance, rod: RodCatalog.Rod): Frame
+	-- Cards stretch with the grid cell so the panel scales cleanly across
+	-- screen sizes. UIGridLayout sets the cell size; the card fills it.
 	local card = UIStyle.MakePanel({
 		Name = rod.id,
-		Size = UDim2.fromOffset(220, 320),
+		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = UIStyle.Palette.Panel,
 	})
 	card.Parent = parent
@@ -185,62 +188,85 @@ local function openShop()
 	shopGui.Parent = screen.Parent
 	activeShopGui = shopGui
 
-	-- Dim background.
-	local dim = Instance.new("Frame")
+	-- Dim background. Click outside the panel to close.
+	local dim = Instance.new("TextButton")
+	dim.Name = "Dim"
+	dim.Text = ""
+	dim.AutoButtonColor = false
 	dim.Size = UDim2.fromScale(1, 1)
 	dim.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	dim.BackgroundTransparency = 0.5
+	dim.BackgroundTransparency = 0.45
 	dim.BorderSizePixel = 0
 	dim.Parent = shopGui
+	dim.MouseButton1Click:Connect(closeShop)
 
+	-- Scale-based panel with min/max so it never overflows or shrinks below usable.
 	local panel = UIStyle.MakePanel({
 		Name = "ShopPanel",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(980, 460),
+		Size = UDim2.fromScale(0.85, 0.78),
 		BackgroundColor3 = UIStyle.Palette.Background,
 		Parent = shopGui,
 	})
+	local panelConstraint = Instance.new("UISizeConstraint")
+	panelConstraint.MinSize = Vector2.new(560, 420)
+	panelConstraint.MaxSize = Vector2.new(1100, 620)
+	panelConstraint.Parent = panel
 
 	UIStyle.MakeLabel({
-		Size = UDim2.new(1, 0, 0, 44),
-		Position = UDim2.fromOffset(0, 12),
+		Name = "Title",
+		Size = UDim2.new(1, -120, 0, 44),
+		Position = UDim2.fromOffset(16, 12),
 		Text = "FISHERMAN'S WARES",
 		Font = UIStyle.FontBold, TextSize = UIStyle.TextSize.Title,
+		TextXAlignment = Enum.TextXAlignment.Left,
 		Parent = panel,
 	})
 
+	-- Bigger, more obvious close button — anchored to top-right with padding.
 	local closeBtn = UIStyle.MakeButton({
-		Size = UDim2.fromOffset(40, 32),
-		Position = UDim2.new(1, -52, 0, 12),
-		Text = "X",
+		Name = "CloseBtn",
+		AnchorPoint = Vector2.new(1, 0),
+		Size = UDim2.fromOffset(52, 44),
+		Position = UDim2.new(1, -16, 0, 12),
+		Text = "✕",
+		TextSize = UIStyle.TextSize.Title,
 		BackgroundColor3 = UIStyle.Palette.Risky,
 		Parent = panel,
 	})
+	UIStyle.ApplyStroke(closeBtn, Color3.fromRGB(180, 60, 60), 2)
 	closeBtn.MouseButton1Click:Connect(closeShop)
 
-	-- Card row.
+	-- Card grid. UIGridLayout wraps cards onto multiple rows when the panel
+	-- is narrow, so the layout stays sane on phone / laptop / desktop.
 	local row = Instance.new("Frame")
 	row.Name = "Cards"
-	row.AnchorPoint = Vector2.new(0.5, 0)
-	row.Position = UDim2.new(0.5, 0, 0, 70)
-	row.Size = UDim2.new(1, -32, 0, 340)
+	row.AnchorPoint = Vector2.new(0.5, 0.5)
+	row.Position = UDim2.new(0.5, 0, 0.55, 0)
+	row.Size = UDim2.new(1, -32, 1, -90)
 	row.BackgroundTransparency = 1
 	row.Parent = panel
 
-	local layout = Instance.new("UIListLayout")
-	layout.FillDirection = Enum.FillDirection.Horizontal
-	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	layout.VerticalAlignment = Enum.VerticalAlignment.Center
-	layout.Padding = UDim.new(0, 16)
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Parent = row
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.fromOffset(220, 340)
+	grid.CellPadding = UDim2.fromOffset(16, 16)
+	grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	grid.VerticalAlignment = Enum.VerticalAlignment.Center
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.Parent = row
 
 	for i, rod in ipairs(RodCatalog.Rods) do
 		local card = buildRodCard(row, rod)
 		card.LayoutOrder = i
 	end
 end
+
+-- Esc closes the shop too.
+UserInputService.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+	if input.KeyCode == Enum.KeyCode.Escape and activeShopGui then closeShop() end
+end)
 
 -- Bind ProximityPrompt.Triggered on every shop trigger tagged Powerup.
 local function bindTrigger(part: Instance)

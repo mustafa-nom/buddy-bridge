@@ -14,7 +14,7 @@ RemoteService.Events = {
 	"RequestRod",            -- player taps NPC ProximityPrompt to receive rod tool
 	"RequestCast",           -- player throws lure ({ aimPos = Vector3 })
 	"RequestReelTap",        -- player taps during reel mini-game
-	"SubmitDecision",        -- KEEP / CUT_BAIT ({ decision = "KEEP" | "CUT_BAIT" })
+	"SubmitDecision",        -- KEEP / CUT_BAIT ({ decision = "KEEP" | "CUT_BAIT", flags = { elementId } })
 	"RequestOpenPhishDex",   -- player opens dex screen
 	"RequestPurchaseRod",    -- shop purchase ({ rodId = string })
 

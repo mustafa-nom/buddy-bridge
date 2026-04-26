@@ -67,6 +67,144 @@ local function renderCard(card: any)
 	sizeConstraint.Parent = panel
 	panel.Parent = cardGui
 
+	local flagMode = false
+	local selectedFlags: { [string]: boolean } = {}
+	local flagTargets: { [string]: GuiObject } = {}
+	local flagHitboxes: { TextButton } = {}
+	local flagToggle: TextButton? = nil
+	local flagTip: TextLabel? = nil
+
+	local function selectedFlagCount(): number
+		local count = 0
+		for _, selected in pairs(selectedFlags) do
+			if selected then count += 1 end
+		end
+		return count
+	end
+
+	local function selectedFlagList(): { string }
+		local flags = {}
+		for elementId, selected in pairs(selectedFlags) do
+			if selected then table.insert(flags, elementId) end
+		end
+		table.sort(flags)
+		return flags
+	end
+
+	local function refreshFlagMarker(elementId: string)
+		local target = flagTargets[elementId]
+		if not target then return end
+
+		local existingMarker = target:FindFirstChild("FlagMarker")
+		local existingStroke = target:FindFirstChild("FlagStroke")
+		if not selectedFlags[elementId] then
+			if existingMarker then existingMarker:Destroy() end
+			if existingStroke then existingStroke:Destroy() end
+			return
+		end
+
+		if not existingStroke then
+			local stroke = Instance.new("UIStroke")
+			stroke.Name = "FlagStroke"
+			stroke.Color = UIStyle.Palette.Risky
+			stroke.Thickness = 3
+			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			stroke.Parent = target
+		end
+
+		if not existingMarker then
+			local marker = Instance.new("TextLabel")
+			marker.Name = "FlagMarker"
+			marker.AnchorPoint = Vector2.new(1, 0)
+			marker.Position = UDim2.new(1, -4, 0, 4)
+			marker.Size = UDim2.fromOffset(58, 18)
+			marker.BackgroundColor3 = UIStyle.Palette.Risky
+			marker.BorderSizePixel = 0
+			marker.Font = UIStyle.FontBold
+			marker.Text = "FLAG"
+			marker.TextSize = 12
+			marker.TextColor3 = Color3.new(1, 1, 1)
+			marker.ZIndex = target.ZIndex + 2
+			marker.Parent = target
+			UIStyle.ApplyCorner(marker, UDim.new(0, 6))
+		end
+	end
+
+	local function updateFlagControls()
+		local count = selectedFlagCount()
+		if flagToggle then
+			flagToggle.Text = flagMode and ("FLAGS ON\n%d SET"):format(count) or "RED\nFLAGS"
+			flagToggle.BackgroundColor3 = flagMode and UIStyle.Palette.Risky or UIStyle.Palette.Accent
+		end
+		if flagTip then
+			flagTip.Visible = flagMode
+		end
+		for _, hitbox in ipairs(flagHitboxes) do
+			hitbox.Visible = flagMode
+		end
+	end
+
+	local function addFlagTarget(target: GuiObject, elementId: string)
+		flagTargets[elementId] = target
+		target.Active = true
+
+		local hitbox = Instance.new("TextButton")
+		hitbox.Name = "FlagHitbox"
+		hitbox.Size = UDim2.fromScale(1, 1)
+		hitbox.BackgroundTransparency = 1
+		hitbox.BorderSizePixel = 0
+		hitbox.Text = ""
+		hitbox.AutoButtonColor = false
+		hitbox.Visible = false
+		hitbox.ZIndex = target.ZIndex + 3
+		hitbox.Parent = target
+		table.insert(flagHitboxes, hitbox)
+
+		hitbox.MouseButton1Click:Connect(function()
+			if not flagMode then return end
+			selectedFlags[elementId] = not selectedFlags[elementId] or nil
+			refreshFlagMarker(elementId)
+			updateFlagControls()
+		end)
+	end
+
+	local flagRail = Instance.new("Frame")
+	flagRail.Name = "FlagRail"
+	flagRail.AnchorPoint = Vector2.new(0, 0.5)
+	flagRail.Position = UDim2.new(1, 12, 0.5, 0)
+	flagRail.Size = UDim2.fromOffset(124, 190)
+	flagRail.BackgroundTransparency = 1
+	flagRail.Parent = panel
+
+	local flagToggleButton = UIStyle.MakeButton({
+		Name = "FlagToggle",
+		Size = UDim2.fromOffset(112, 68),
+		Position = UDim2.fromOffset(6, 0),
+		Text = "RED\nFLAGS",
+		TextSize = UIStyle.TextSize.Body,
+		BackgroundColor3 = UIStyle.Palette.Accent,
+		Parent = flagRail,
+	})
+	flagToggle = flagToggleButton
+	flagToggleButton.TextWrapped = true
+	flagToggleButton.MouseButton1Click:Connect(function()
+		flagMode = not flagMode
+		updateFlagControls()
+	end)
+
+	local flagTipLabel = UIStyle.MakeLabel({
+		Name = "FlagTip",
+		Size = UDim2.new(1, 0, 0, 104),
+		Position = UDim2.fromOffset(0, 80),
+		Text = "Tap suspicious sender, subject, body, or link spots. Tap again to remove a flag.",
+		TextSize = UIStyle.TextSize.Caption,
+		TextWrapped = true,
+		TextColor3 = UIStyle.Palette.TextMuted,
+		Parent = flagRail,
+	})
+	flagTip = flagTipLabel
+	flagTipLabel.Visible = false
+
 	-- Header row: avatar + sender name + sender address.
 	local senderRow = Instance.new("Frame")
 	senderRow.Name = "Sender"
@@ -102,6 +240,7 @@ local function renderCard(card: any)
 		TextXAlignment = Enum.TextXAlignment.Left,
 	})
 	senderAddr.Parent = senderRow
+	addFlagTarget(senderAddr, "sender.address")
 
 	-- Subject below the header.
 	local subjectLabel = UIStyle.MakeLabel({
@@ -114,6 +253,7 @@ local function renderCard(card: any)
 		TextWrapped = true,
 	})
 	subjectLabel.Parent = panel
+	addFlagTarget(subjectLabel, "subject")
 
 	-- Scrollable body + links. Bottom is reserved for the decision buttons
 	-- via the AnchorPoint trick below.
@@ -155,6 +295,7 @@ local function renderCard(card: any)
 		LayoutOrder = 1,
 	})
 	bodyLabel.Parent = scroll
+	addFlagTarget(bodyLabel, "body")
 
 	if card.links and #card.links > 0 then
 		for i, link in ipairs(card.links) do
@@ -173,6 +314,7 @@ local function renderCard(card: any)
 				TextWrapped = false,
 			})
 			linkLabel.Parent = linkPanel
+			addFlagTarget(linkPanel, string.format("links[%d]", i))
 		end
 	end
 
@@ -191,7 +333,7 @@ local function renderCard(card: any)
 		btn.AutoButtonColor = false
 		btn.Text = "..."
 		twin.Active = false
-		RemoteService.FireServer("SubmitDecision", { decision = decision })
+		RemoteService.FireServer("SubmitDecision", { decision = decision, flags = selectedFlagList() })
 	end
 
 	local keepBtn = UIStyle.MakeButton({
