@@ -485,11 +485,22 @@ local function buildRodCard(parent: Instance, rod: RodCatalog.Rod): Frame
 	-- Rod name (cream/white).
 	UIStyle.MakeLabel({
 		Size = UDim2.new(1, -12, 0, 22),
-		Position = UDim2.new(0, 6, 1, -78),
+		Position = UDim2.new(0, 6, 1, -104),
 		Text = rod.name,
 		Font = UIStyle.FontBold,
 		TextSize = UIStyle.TextSize.Body,
 		TextColor3 = UIStyle.Palette.TextPrimary,
+		Parent = card,
+	})
+
+	UIStyle.MakeLabel({
+		Size = UDim2.new(1, -12, 0, 24),
+		Position = UDim2.new(0, 6, 1, -84),
+		Text = rod.description,
+		TextSize = UIStyle.TextSize.Caption,
+		TextColor3 = UIStyle.Palette.TextMuted,
+		TextWrapped = true,
+		TextYAlignment = Enum.TextYAlignment.Top,
 		Parent = card,
 	})
 
@@ -567,7 +578,7 @@ local function buildHeroCard(parent: Instance, rod: RodCatalog.Rod): Frame
 	-- Big name, gold ("ASTRAL ROD" style).
 	UIStyle.MakeLabel({
 		Size = UDim2.new(1, -16, 0, 32),
-		Position = UDim2.new(0, 8, 0, 264),
+		Position = UDim2.new(0, 8, 1, -128),
 		Text = string.upper(rod.name),
 		Font = UIStyle.FontDisplay,
 		TextSize = 26,
@@ -576,11 +587,11 @@ local function buildHeroCard(parent: Instance, rod: RodCatalog.Rod): Frame
 	})
 
 	UIStyle.MakeLabel({
-		Size = UDim2.new(1, -24, 0, 70),
-		Position = UDim2.new(0, 12, 0, 300),
+		Size = UDim2.new(1, -24, 0, 26),
+		Position = UDim2.new(0, 12, 1, -100),
 		Text = rod.description,
-		TextSize = UIStyle.TextSize.Subtitle,
-		TextColor3 = UIStyle.Palette.TextPrimary,
+		TextSize = UIStyle.TextSize.Caption,
+		TextColor3 = UIStyle.Palette.TextMuted,
 		TextWrapped = true,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		Parent = card,
