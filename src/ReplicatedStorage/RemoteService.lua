@@ -32,6 +32,9 @@ RemoteService.Events = {
 	-- Server → Client
 	"ShowIntroSlide",
 	"TutorialNudge",
+	"BossEventStarted",
+	"BossEventClaimed",
+	"BossEventEnded",
 	"BiteOccurred",
 	"FieldGuideEntryUnlocked",
 	"ReelMinigameStarted",

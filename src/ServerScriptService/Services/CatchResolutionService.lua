@@ -27,6 +27,7 @@ local StreakService = require(Services:WaitForChild("StreakService"))
 local AnnouncementService = require(Services:WaitForChild("AnnouncementService"))
 local BobberService = require(Services:WaitForChild("BobberService"))
 local ReelMinigameService = require(Services:WaitForChild("ReelMinigameService"))
+local BossEventService = require(Services:WaitForChild("BossEventService"))
 
 local CatchResolutionService = {}
 
@@ -72,6 +73,7 @@ local function finalizeCatch(player: Player, enc, wasCorrect: boolean, outcome: 
 
 	local streakMult = StreakService.MultiplierFor(streak)
 	local luckyMult = enc.luckyBobber and Constants.LUCKY_BOBBER_MULTIPLIER or 1
+	local bossMult = enc.isBoss and BossEventService.RewardMultiplier() or 1
 
 	if wasCorrect then
 		DataService.AddFish(player, fish.id, fish.rarity)
@@ -82,7 +84,7 @@ local function finalizeCatch(player: Player, enc, wasCorrect: boolean, outcome: 
 
 	local reward = RewardService.GrantCatch(player, fish.id, wasCorrect, enc.zoneTier, {
 		streakMultiplier = streakMult,
-		luckyMultiplier = luckyMult,
+		luckyMultiplier = luckyMult * bossMult,
 		reelQuality = reelQuality,
 	})
 	local lessonLine = wasCorrect and fish.lessonLineCorrect or fish.lessonLineWrong
@@ -106,6 +108,11 @@ local function finalizeCatch(player: Player, enc, wasCorrect: boolean, outcome: 
 		end
 	end
 
+	-- Notify the boss event so it can close + announce.
+	if enc.isBoss then
+		BossEventService.NoteResolution(player, fish.id, wasCorrect)
+	end
+
 	BobberService.Despawn(player)
 
 	RemoteService.FireClient(player, "CatchResolved", {
@@ -123,6 +130,7 @@ local function finalizeCatch(player: Player, enc, wasCorrect: boolean, outcome: 
 		AquariumPromptable = wasCorrect and fish.correctAction == Actions.Reel,
 		Streak = streak,
 		LuckyBobber = enc.luckyBobber == true,
+		Boss = enc.isBoss == true,
 		Nudge = nudge,
 	})
 

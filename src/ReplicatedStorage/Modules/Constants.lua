@@ -91,6 +91,21 @@ Constants.TITLES = {
 	{ threshold = 70,  title = "Lodge Legend" },
 }
 
+-- Server-wide boss event.
+Constants.BOSS = {
+	IntervalSeconds = 480,       -- 8 minutes between events
+	WindowSeconds = 90,          -- how long the event stays open
+	StartupGraceSeconds = 75,    -- initial wait after server boot
+	RewardMultiplier = 3.0,      -- on top of normal pearls
+	-- Eligible boss fish ids — pulled from FishRegistry by id.
+	BossFishIds = {
+		"counterfeit_admin_cod",
+		"real_friend_rainbow",
+		"hallucinated_halibut",
+		"link_shark",
+	},
+}
+
 -- Bobber world part defaults.
 Constants.BOBBER = {
 	ForwardOffset = 7.5,

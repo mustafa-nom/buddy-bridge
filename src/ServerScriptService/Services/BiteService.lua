@@ -17,6 +17,7 @@ local Services = script.Parent
 local CastingService = require(Services:WaitForChild("CastingService"))
 local BobberService = require(Services:WaitForChild("BobberService"))
 local StreakService = require(Services:WaitForChild("StreakService"))
+local BossEventService = require(Services:WaitForChild("BossEventService"))
 
 local BiteService = {}
 
@@ -50,13 +51,16 @@ local function scheduleBite(player: Player, enc)
 		if current ~= enc then return end
 		if enc.state ~= FishEncounterTypes.States.Waiting then return end
 
-		local fish = pickFish(enc.zoneTier, recentFishByPlayer[player])
+		-- Boss event override: if a global boss is open, this player claims it.
+		local bossFish = BossEventService.TryClaim(player)
+		local fish = bossFish or pickFish(enc.zoneTier, recentFishByPlayer[player])
 		if not fish then return end
 		recentFishByPlayer[player] = fish.id
 
 		enc.fishId = fish.id
 		enc.correctAction = fish.correctAction
 		enc.bobberCue = fish.bobberCue
+		enc.isBoss = bossFish ~= nil
 		enc.bitedAt = os.clock()
 		enc.state = FishEncounterTypes.States.BitePending
 
@@ -70,6 +74,7 @@ local function scheduleBite(player: Player, enc)
 			DecisionWindowSec = Constants.DECISION_WINDOW_SECONDS,
 			ZoneTier = enc.zoneTier,
 			LuckyBobber = enc.luckyBobber == true,
+			Boss = enc.isBoss == true,
 		})
 
 		-- Decision-window expiry: fish escapes if no action.
