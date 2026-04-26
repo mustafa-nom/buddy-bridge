@@ -9,12 +9,28 @@ local Services = script.Parent
 local DataService = require(Services:WaitForChild("DataService"))
 
 local ScoringService = {}
+local debugCoinCooldownByPlayer: { [Player]: number } = {}
 
 local function pushHud(player: Player)
 	RemoteService.FireClient(player, "HudUpdated", DataService.Snapshot(player))
 end
 
-function ScoringService.Init() end
+function ScoringService.Init()
+	RemoteService.OnServerEvent("RequestDebugCoins", function(player)
+		local now = os.clock()
+		if (debugCoinCooldownByPlayer[player] or 0) > now then return end
+		debugCoinCooldownByPlayer[player] = now + 0.25
+
+		local profile = DataService.Get(player)
+		profile.coins += 500
+		pushHud(player)
+		RemoteService.FireClient(player, "Notify", {
+			kind = "Success",
+			message = "+500 test coins",
+			duration = 1.5,
+		})
+	end)
+end
 
 -- Called by DecisionService after every catch resolution.
 -- `wasCorrect` tracks accuracy. `card` provides reward base; difficulty bumps it.

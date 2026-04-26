@@ -17,6 +17,7 @@ RemoteService.Events = {
 	"SubmitDecision",        -- KEEP / CUT_BAIT ({ decision = "KEEP" | "CUT_BAIT", flags = { elementId } })
 	"RequestOpenPhishDex",   -- player opens dex screen
 	"RequestPurchaseRod",    -- shop purchase ({ rodId = string })
+	"RequestDebugCoins",     -- test shortcut: grant coins while iterating locally
 
 	-- Server → Client
 	"RodGranted",            -- ack that rod is in player's backpack
