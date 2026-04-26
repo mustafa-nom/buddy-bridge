@@ -1,11 +1,14 @@
 --!strict
 -- After PairAssigned, shows a role-select panel: pick Explorer or Guide,
--- then Start Round.
+-- then Start Round. Also exposes "Just TSA" / "Just Strangers" debug
+-- buttons that start a round with an override level sequence — useful for
+-- 2-player testing of one level at a time.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 local Modules = ReplicatedStorage:WaitForChild("Modules")
 local RoleTypes = require(Modules:WaitForChild("RoleTypes"))
+local LevelTypes = require(Modules:WaitForChild("LevelTypes"))
 
 local UIFolder = script.Parent
 local UIBuilder = require(UIFolder:WaitForChild("UIBuilder"))
@@ -21,7 +24,7 @@ local function build()
 	end
 	panel = UIStyle.MakePanel({
 		Name = "RoleSelect",
-		Size = UDim2.new(0, 480, 0, 280),
+		Size = UDim2.new(0, 540, 0, 380),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(0.5, 0, 0.5, 0),
 		Parent = screen,
@@ -61,12 +64,40 @@ local function build()
 	guideBtn.Parent = panel
 
 	local startBtn = UIStyle.MakeButton({
-		Size = UDim2.new(1, 0, 0, 60),
-		Position = UDim2.new(0, 0, 1, -60),
-		Text = "Start Round",
+		Size = UDim2.new(1, 0, 0, 56),
+		Position = UDim2.new(0, 0, 0, 188),
+		Text = "Start Round (both levels)",
 		BackgroundColor3 = UIStyle.Palette.Safe,
 	})
 	startBtn.Parent = panel
+
+	-- Debug / test shortcuts: skip directly to one level. Server validates
+	-- the override against LevelTypes.IsValid; bad input falls back to the
+	-- default DemoSequence.
+	local testLabel = UIStyle.MakeLabel({
+		Size = UDim2.new(1, 0, 0, 18),
+		Position = UDim2.new(0, 0, 0, 250),
+		Text = "Test shortcuts",
+		TextSize = UIStyle.TextSize.Caption,
+		TextColor3 = UIStyle.Palette.TextMuted,
+	})
+	testLabel.Parent = panel
+
+	local justSdBtn = UIStyle.MakeButton({
+		Size = UDim2.new(0.5, -8, 0, 56),
+		Position = UDim2.new(0, 0, 0, 272),
+		Text = "👀 Just Strangers",
+		BackgroundColor3 = UIStyle.Palette.AskFirst,
+	})
+	justSdBtn.Parent = panel
+
+	local justBpcBtn = UIStyle.MakeButton({
+		Size = UDim2.new(0.5, -8, 0, 56),
+		Position = UDim2.new(0.5, 8, 0, 272),
+		Text = "🧳 Just TSA",
+		BackgroundColor3 = UIStyle.Palette.Highlight,
+	})
+	justBpcBtn.Parent = panel
 
 	explorerBtn.Activated:Connect(function()
 		if locked then return end
@@ -78,6 +109,12 @@ local function build()
 	end)
 	startBtn.Activated:Connect(function()
 		RemoteService.FireServer("StartRound")
+	end)
+	justSdBtn.Activated:Connect(function()
+		RemoteService.FireServer("StartRound", { LevelTypes.StrangerDangerPark })
+	end)
+	justBpcBtn.Activated:Connect(function()
+		RemoteService.FireServer("StartRound", { LevelTypes.BackpackCheckpoint })
 	end)
 end
 
