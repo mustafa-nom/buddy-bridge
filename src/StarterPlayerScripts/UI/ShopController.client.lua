@@ -126,7 +126,7 @@ local function makeShopPreviewFrame(parent: Instance, name: string, topColor: Co
 	vf.LightColor = Color3.fromRGB(255, 255, 245)
 	vf.Parent = parent
 	UIStyle.ApplyCorner(vf, UDim.new(0, 12))
-	UIStyle.ApplyGradient(vf, topColor, bottomColor, 90)
+	UIStyle.ApplyGradient(vf, { top = topColor, bottom = bottomColor, rotation = 90 })
 	return vf
 end
 
