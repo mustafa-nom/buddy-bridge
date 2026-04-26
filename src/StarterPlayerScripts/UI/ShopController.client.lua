@@ -805,6 +805,21 @@ local function openShop()
 		Parent = panel,
 	})
 
+	-- Tagline — small italic-feeling caption right under the banner.
+	-- Frames the shop as part of the angler's mission, not a generic store.
+	UIStyle.MakeLabel({
+		Name = "Tagline",
+		Size = UDim2.new(1, -32, 0, 18),
+		Position = UDim2.fromOffset(16, 38),
+		Text = "Gear up.  Spot the scams.  Save the sea.",
+		Font = UIStyle.Font,
+		TextSize = UIStyle.TextSize.Caption,
+		TextColor3 = UIStyle.Palette.TitleGold,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextTransparency = 0.15,
+		Parent = panel,
+	})
+
 	-- Close button — small dark, top-right corner.
 	local closeBtn = UIStyle.MakeButton({
 		Name = "CloseBtn",
@@ -836,13 +851,96 @@ local function openShop()
 	tabLayout.Parent = tabRow
 
 	-- Content area. Rods use the polished hero layout; catchers and gear use
-	-- a scrollable grid inside this frame.
+	-- a scrollable grid inside this frame. Bottom 36px reserved for the
+	-- Angler's Tip ticker.
 	local content = Instance.new("Frame")
 	content.Name = "Content"
 	content.BackgroundTransparency = 1
 	content.Position = UDim2.new(0, 16, 0, 104)
-	content.Size = UDim2.new(1, -32, 1, -124)
+	content.Size = UDim2.new(1, -32, 1, -156)
 	content.Parent = panel
+
+	-- Angler's Tip ticker. Rotates real digital-safety tips written in the
+	-- angler's-journal voice (no lectures). This is the "education through
+	-- mechanics" rule from CLAUDE.md applied to chrome: the lesson is on
+	-- the wall, not in a popup quiz.
+	local tipStrip = Instance.new("Frame")
+	tipStrip.Name = "TipStrip"
+	tipStrip.AnchorPoint = Vector2.new(0.5, 1)
+	tipStrip.Position = UDim2.new(0.5, 0, 1, -12)
+	tipStrip.Size = UDim2.new(1, -32, 0, 28)
+	tipStrip.BackgroundColor3 = UIStyle.Palette.PanelDeep
+	tipStrip.BackgroundTransparency = 0.25
+	tipStrip.BorderSizePixel = 0
+	tipStrip.Parent = panel
+	UIStyle.ApplyCorner(tipStrip, UDim.new(0, 6))
+	UIStyle.ApplyStroke(tipStrip, UIStyle.Palette.SlotStroke, 1)
+
+	-- Small fish-hook glyph on the left of the strip ("⚓"-style mark).
+	UIStyle.MakeLabel({
+		Size = UDim2.fromOffset(22, 22),
+		Position = UDim2.fromOffset(8, 3),
+		Text = "◆",
+		Font = UIStyle.FontDisplay,
+		TextSize = UIStyle.TextSize.Body,
+		TextColor3 = UIStyle.Palette.TitleGold,
+		Parent = tipStrip,
+	})
+
+	UIStyle.MakeLabel({
+		Name = "TipPrefix",
+		Size = UDim2.fromOffset(108, 22),
+		Position = UDim2.fromOffset(32, 3),
+		Text = "ANGLER'S TIP",
+		Font = UIStyle.FontDisplay,
+		TextSize = UIStyle.TextSize.Caption,
+		TextColor3 = UIStyle.Palette.TitleGold,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = tipStrip,
+	})
+
+	local tipLabel = UIStyle.MakeLabel({
+		Name = "TipText",
+		Size = UDim2.new(1, -160, 0, 22),
+		Position = UDim2.fromOffset(148, 3),
+		Text = "",
+		Font = UIStyle.Font,
+		TextSize = UIStyle.TextSize.Subtitle,
+		TextColor3 = UIStyle.Palette.TextPrimary,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Parent = tipStrip,
+	})
+
+	local tips = {
+		"Free Robux offers are bait. Cut the line.",
+		"Real moderators never DM you for your password.",
+		"If a deal feels too good to be true — it is.",
+		"Strangers asking for personal info? Refuse the catch.",
+		"Check the URL. roblox.com is real. r0blox.com is not.",
+		"Verify weird links with a friend before you reel.",
+		"Imposter mods get reported, not engaged.",
+		"AI-written messages can lie. Trust patterns, not promises.",
+		"Screenshots can be faked. So can urgency.",
+		"When in doubt, release the fish and ask later.",
+	}
+
+	local tipIdx = 1
+	local function showTip()
+		tipLabel.Text = tips[tipIdx]
+		tipIdx = (tipIdx % #tips) + 1
+	end
+	showTip()
+	local tipThread = task.spawn(function()
+		while tipStrip.Parent do
+			task.wait(5)
+			if not tipStrip.Parent then return end
+			showTip()
+		end
+	end)
+	tipStrip.Destroying:Connect(function()
+		task.cancel(tipThread)
+	end)
 
 	-- Sort: lower tiers go to grid, top tier becomes hero.
 	local rods = {}
