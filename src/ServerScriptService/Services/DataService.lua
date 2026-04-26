@@ -26,6 +26,10 @@ export type PlayerData = {
 	JournalUnlocked: { [string]: boolean },
 	Aquarium: { string },          -- ordered list of fishIds placed
 	HasSeenTutorial: { [string]: boolean },
+	Streak: number,
+	BestStreak: number,
+	TotalCorrectCatches: number,
+	Title: string,
 }
 
 local data: { [Player]: PlayerData } = {}
@@ -41,6 +45,10 @@ local function defaults(): PlayerData
 		JournalUnlocked = {},
 		Aquarium = {},
 		HasSeenTutorial = {},
+		Streak = 0,
+		BestStreak = 0,
+		TotalCorrectCatches = 0,
+		Title = (Constants.TITLES[1] and Constants.TITLES[1].title) or "Tadpole",
 	}
 end
 
@@ -55,6 +63,10 @@ local function pushSnapshot(player: Player)
 		FishInventory = d.FishInventory,
 		JournalUnlocked = d.JournalUnlocked,
 		Aquarium = d.Aquarium,
+		Streak = d.Streak,
+		BestStreak = d.BestStreak,
+		TotalCorrectCatches = d.TotalCorrectCatches,
+		Title = d.Title,
 	})
 end
 
@@ -197,6 +209,10 @@ function DataService.Init()
 			FishInventory = d.FishInventory,
 			JournalUnlocked = d.JournalUnlocked,
 			Aquarium = d.Aquarium,
+			Streak = d.Streak,
+			BestStreak = d.BestStreak,
+			TotalCorrectCatches = d.TotalCorrectCatches,
+			Title = d.Title,
 		}
 	end)
 end
