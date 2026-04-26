@@ -8,6 +8,8 @@
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PhishConstants = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("PhishConstants"))
@@ -194,6 +196,106 @@ local function resetMap()
 end
 
 -- ---------------------------------------------------------------------------
+-- 3. Boat buoyancy. Water tiles are CanCollide=false (so players can swim
+--    through), which means an unanchored boat hull falls straight through
+--    them. Each BoatHull-tagged BasePart gets a server-side VectorForce
+--    spring-damped to the water surface — same idea as SwimController's
+--    player buoyancy, but server-side and applied per hull assembly.
+-- ---------------------------------------------------------------------------
+
+local BUOYANCY_SPRING = 35
+local BUOYANCY_DAMPING = 8
+local BUOYANCY_OFFSET = -0.2          -- hull bottom sits this far below water surface
+local BUOYANCY_RAYCAST_UP = 16
+local BUOYANCY_RAYCAST_DOWN = 40
+local BUOYANCY_MAX_FORCE = 60000
+
+type BuoyancyRefs = { force: VectorForce, attachment: Attachment }
+local hullForces: { [BasePart]: BuoyancyRefs } = {}
+
+local function ensureBuoyancyForce(part: BasePart)
+	if hullForces[part] then return end
+	if part.Anchored then return end
+	local att = Instance.new("Attachment")
+	att.Name = "PhishBoatBuoyancyAttachment"
+	att.Parent = part
+	local force = Instance.new("VectorForce")
+	force.Name = "PhishBoatBuoyancy"
+	force.Attachment0 = att
+	force.RelativeTo = Enum.ActuatorRelativeTo.World
+	force.ApplyAtCenterOfMass = true
+	force.Force = Vector3.zero
+	force.Parent = part
+	hullForces[part] = { force = force, attachment = att }
+end
+
+local function removeBuoyancyForce(part: BasePart)
+	local refs = hullForces[part]
+	if not refs then return end
+	if refs.force.Parent then refs.force:Destroy() end
+	if refs.attachment.Parent then refs.attachment:Destroy() end
+	hullForces[part] = nil
+end
+
+local function waterSurfaceUnder(part: BasePart): number?
+	local map = Workspace:FindFirstChild("PhishMap")
+	local waterFolder = map and map:FindFirstChild("PhishWater")
+	if not waterFolder then return nil end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { waterFolder }
+	params.IgnoreWater = true
+	local origin = part.Position + Vector3.new(0, BUOYANCY_RAYCAST_UP, 0)
+	local direction = Vector3.new(0, -(BUOYANCY_RAYCAST_UP + BUOYANCY_RAYCAST_DOWN), 0)
+	local result = Workspace:Raycast(origin, direction, params)
+	if result and result.Instance and CollectionService:HasTag(result.Instance, WATER_TAG) then
+		return result.Position.Y
+	end
+	return nil
+end
+
+local function updateBuoyancy()
+	-- Dedupe by assembly: if the user tagged multiple parts of the same
+	-- welded boat, applying the force to all of them stacks gravity-cancel
+	-- and launches the boat. One force per assembly.
+	local seenAssemblies: { [BasePart]: boolean } = {}
+	for part, refs in pairs(hullForces) do
+		if not part.Parent or part.Anchored then
+			removeBuoyancyForce(part)
+			continue
+		end
+		local rootPart = part.AssemblyRootPart or part
+		if seenAssemblies[rootPart] then
+			refs.force.Force = Vector3.zero
+			continue
+		end
+		seenAssemblies[rootPart] = true
+
+		local waterY = waterSurfaceUnder(part)
+		if not waterY then
+			refs.force.Force = Vector3.zero
+			continue
+		end
+		local mass = part.AssemblyMass
+		local targetY = waterY + BUOYANCY_OFFSET
+		local displacement = targetY - part.Position.Y
+		local verticalVelocity = part.AssemblyLinearVelocity.Y
+		local extra = math.clamp(
+			(displacement * BUOYANCY_SPRING - verticalVelocity * BUOYANCY_DAMPING) * mass,
+			-BUOYANCY_MAX_FORCE, BUOYANCY_MAX_FORCE
+		)
+		local upward = mass * Workspace.Gravity + extra
+		refs.force.Force = Vector3.new(0, upward, 0)
+	end
+end
+
+local function bindHull(inst: Instance)
+	if inst:IsA("BasePart") then
+		ensureBuoyancyForce(inst)
+	end
+end
+
+-- ---------------------------------------------------------------------------
 -- Init.
 -- ---------------------------------------------------------------------------
 
@@ -204,6 +306,13 @@ function MapIntegrityService.Init()
 	ensureEscapeRamps()
 	hideAllVehicleSeatHuds()
 	CollectionService:GetInstanceAddedSignal(BOAT_SEAT_TAG):Connect(hideVehicleSeatHud)
+
+	-- Wire buoyancy to existing + future BoatHull-tagged parts.
+	for _, p in ipairs(CollectionService:GetTagged(BOAT_HULL_TAG)) do
+		bindHull(p)
+	end
+	CollectionService:GetInstanceAddedSignal(BOAT_HULL_TAG):Connect(bindHull)
+	RunService.Heartbeat:Connect(updateBuoyancy)
 
 	takeSnapshots()
 
