@@ -28,6 +28,7 @@ local AnnouncementService = require(Services:WaitForChild("AnnouncementService")
 local BobberService = require(Services:WaitForChild("BobberService"))
 local ReelMinigameService = require(Services:WaitForChild("ReelMinigameService"))
 local BossEventService = require(Services:WaitForChild("BossEventService"))
+local GoalsService = require(Services:WaitForChild("GoalsService"))
 
 local CatchResolutionService = {}
 
@@ -80,6 +81,8 @@ local function finalizeCatch(player: Player, enc, wasCorrect: boolean, outcome: 
 		DataService.UnlockJournal(player, fish.id)
 		FieldGuideService.UnlockEntry(player, fish.id)
 		maybeUpdateTitle(player)
+		GoalsService.RecordCorrectCatch(player, fish.category, fish.rarity, fish.correctAction)
+		GoalsService.RecordStreak(player, streak)
 	end
 
 	local reward = RewardService.GrantCatch(player, fish.id, wasCorrect, enc.zoneTier, {
@@ -87,6 +90,9 @@ local function finalizeCatch(player: Player, enc, wasCorrect: boolean, outcome: 
 		luckyMultiplier = luckyMult * bossMult,
 		reelQuality = reelQuality,
 	})
+	if reward.Pearls and reward.Pearls > 0 then
+		GoalsService.RecordPearlsEarned(player, reward.Pearls)
+	end
 	local lessonLine = wasCorrect and fish.lessonLineCorrect or fish.lessonLineWrong
 
 	-- Cut-line streak nudge (separate from the multiplier streak — this one
@@ -147,6 +153,7 @@ local function handleVerify(player: Player, payload: any)
 	if enc.fishId then
 		FieldGuideService.RevealEntry(player, enc.fishId, true)
 	end
+	GoalsService.RecordVerifyUse(player)
 	task.delay(Constants.VERIFY_PAUSE_SECONDS, function()
 		local current = CastingService.GetEncounter(player)
 		if current ~= enc then return end

@@ -17,6 +17,7 @@ local function load(name: string)
 end
 
 local DataService = load("DataService")
+local GoalsService = load("GoalsService")
 local IntroService = load("IntroService")
 local PondService = load("PondService")
 local BobberService = load("BobberService")
@@ -36,6 +37,7 @@ local SellService = load("SellService")
 local RowboatService = load("RowboatService")
 
 DataService.Init()
+GoalsService.Init()
 IntroService.Init()
 PondService.Init()
 BobberService.Init()

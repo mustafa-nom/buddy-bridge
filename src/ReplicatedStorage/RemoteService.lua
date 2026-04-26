@@ -35,6 +35,8 @@ RemoteService.Events = {
 	"BossEventStarted",
 	"BossEventClaimed",
 	"BossEventEnded",
+	"GoalsUpdated",
+	"GoalCompleted",
 	"BiteOccurred",
 	"FieldGuideEntryUnlocked",
 	"ReelMinigameStarted",

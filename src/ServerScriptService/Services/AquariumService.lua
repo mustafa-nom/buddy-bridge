@@ -18,6 +18,7 @@ local Services = script.Parent
 local Helpers = Services:WaitForChild("Helpers")
 local RemoteValidation = require(Helpers:WaitForChild("RemoteValidation"))
 local DataService = require(Services:WaitForChild("DataService"))
+local GoalsService = require(Services:WaitForChild("GoalsService"))
 
 local AquariumService = {}
 
@@ -116,6 +117,7 @@ local function handlePlace(player: Player, payload: any)
 	end
 	local placed = DataService.PlaceInAquarium(player, fish.id)
 	if not placed then return end
+	GoalsService.RecordAquariumPlace(player)
 	refreshAllDisplays()
 end
 
