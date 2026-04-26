@@ -27,67 +27,99 @@ local function rgb(t: { number }): Color3
 	return Color3.fromRGB(t[1], t[2], t[3])
 end
 
--- Build the visible rod parts onto a Handle. Used by both Tool (in-hand) and
--- Model (display) builders so the visuals stay in sync.
+local function boxBetween(a: Vector3, b: Vector3, thickness: number): (CFrame, Vector3)
+	local midpoint = (a + b) * 0.5
+	local direction = b - a
+	return CFrame.lookAt(midpoint, b), Vector3.new(thickness, thickness, direction.Magnitude)
+end
+
+-- Build the visible rod parts onto a small invisible Handle. Used by both Tool
+-- (in-hand) and Model (display) builders so the visuals stay in sync.
 local function attachAnatomy(handle: Part, parent: Instance, spec: RodCatalog.Rod)
-	local function add(name: string, props: { [string]: any }, weldOffset: CFrame): Part
+	local function add(name: string, props: { [string]: any }, localCFrame: CFrame): Part
 		local p = Instance.new("Part")
 		p.Name = name
 		p.Anchored = false
 		p.CanCollide = false
+		p.CanTouch = false
+		p.CanQuery = false
 		p.Massless = true
 		p.TopSurface = Enum.SurfaceType.Smooth
 		p.BottomSurface = Enum.SurfaceType.Smooth
 		for k, v in pairs(props) do (p :: any)[k] = v end
 		p.Parent = parent
-		p.CFrame = handle.CFrame * weldOffset
+		p.CFrame = handle.CFrame * localCFrame
 		local w = Instance.new("WeldConstraint")
 		w.Part0 = handle; w.Part1 = p; w.Parent = handle
 		return p
 	end
 
-	add("GripWrap", {
-		Size = Vector3.new(0.46, 1.2, 0.46), Color = rgb(spec.wrapColor),
-		Material = Enum.Material.Fabric, Shape = Enum.PartType.Cylinder,
-	}, CFrame.new(0, -1.2, 0))
+	local function addSegment(name: string, a: Vector3, b: Vector3, thickness: number, color: Color3, material: Enum.Material): Part
+		local localCFrame, size = boxBetween(a, b, thickness)
+		return add(name, {
+			Size = size,
+			Color = color,
+			Material = material,
+		}, localCFrame)
+	end
 
-	add("ReelHousing", {
-		Size = Vector3.new(0.7, 0.5, 0.5), Color = rgb(spec.reelColor),
-		Material = Enum.Material.Metal, Shape = Enum.PartType.Cylinder,
-	}, CFrame.new(0.3, -0.4, 0))
-	add("ReelDisc", {
-		Size = Vector3.new(0.15, 0.9, 0.9), Color = rgb(spec.reelColor),
-		Material = Enum.Material.Metal, Shape = Enum.PartType.Cylinder,
-	}, CFrame.new(0.6, -0.4, 0))
+	local butt = Vector3.new(0, -0.58, 0.18)
+	local gripTop = Vector3.new(0, 0.45, -0.16)
+	local shaftMid = Vector3.new(0, 1.18, -0.78)
+	local tipPos = Vector3.new(0, 3.25, -2.55)
+
+	addSegment("GripWrap", butt, gripTop, 0.34, rgb(spec.wrapColor), Enum.Material.Fabric)
+
+	add("ButtCap", {
+		Size = Vector3.new(0.46, 0.16, 0.32), Color = rgb(spec.bandColor),
+		Material = Enum.Material.Metal,
+	}, CFrame.new(butt))
+
+	addSegment("LowerShaft", gripTop, shaftMid, 0.18, rgb(spec.handleColor), Enum.Material.Wood)
 
 	add("MidBand", {
-		Size = Vector3.new(0.42, 0.3, 0.42), Color = rgb(spec.bandColor),
-		Material = Enum.Material.Metal, Shape = Enum.PartType.Cylinder,
-	}, CFrame.new(0, 0.6, 0))
+		Size = Vector3.new(0.28, 0.28, 0.2), Color = rgb(spec.bandColor),
+		Material = Enum.Material.Metal,
+	}, CFrame.new(shaftMid))
+
+	local reelCenter = Vector3.new(0.34, 0.0, 0.0)
+	add("ReelHousing", {
+		Size = Vector3.new(0.42, 0.42, 0.42), Color = rgb(spec.reelColor),
+		Material = Enum.Material.Metal, Shape = Enum.PartType.Ball,
+	}, CFrame.new(reelCenter))
+	add("ReelDisc", {
+		Size = Vector3.new(0.18, 0.54, 0.54), Color = rgb(spec.reelColor),
+		Material = Enum.Material.Metal,
+	}, CFrame.new(reelCenter + Vector3.new(0.18, 0, 0)))
+	addSegment("ReelArm", reelCenter + Vector3.new(0.26, -0.1, 0), reelCenter + Vector3.new(0.44, -0.32, 0.06),
+		0.08, rgb(spec.bandColor), Enum.Material.Metal)
+	add("ReelKnob", {
+		Size = Vector3.new(0.16, 0.16, 0.16), Color = rgb(spec.tipColor),
+		Material = Enum.Material.SmoothPlastic, Shape = Enum.PartType.Ball,
+	}, CFrame.new(reelCenter + Vector3.new(0.46, -0.34, 0.06)))
 
 	local upperMaterial = Enum.Material[spec.upperShaftMaterial] or Enum.Material.Wood
-	add("UpperShaft", {
-		Size = Vector3.new(0.22, 2.4, 0.22), Color = rgb(spec.upperShaftColor),
-		Material = upperMaterial, Shape = Enum.PartType.Cylinder,
-	}, CFrame.new(0, 2.0, 0))
+	addSegment("UpperShaft", shaftMid, tipPos, 0.1, rgb(spec.upperShaftColor), upperMaterial)
 
-	add("Tip", {
-		Size = Vector3.new(0.28, 0.28, 0.28), Color = rgb(spec.tipColor),
+	local tip = add("Tip", {
+		Size = Vector3.new(0.24, 0.24, 0.24), Color = rgb(spec.tipColor),
 		Material = Enum.Material.Neon, Shape = Enum.PartType.Ball,
-	}, CFrame.new(0, 3.4, 0))
+	}, CFrame.new(tipPos))
 	local tipLight = Instance.new("PointLight")
 	tipLight.Color = rgb(spec.tipColor)
 	tipLight.Range = spec.tipGlowRange; tipLight.Brightness = 1.4
-	tipLight.Parent = parent:FindFirstChild("Tip")
+	tipLight.Parent = tip
 end
 
-local function buildHandle(name: string, color: Color3): Part
+local function buildHandle(name: string): Part
 	local handle = Instance.new("Part")
 	handle.Name = name
-	handle.Size = Vector3.new(0.4, 4, 0.4)
-	handle.Color = color
-	handle.Material = Enum.Material.Wood
-	handle.Shape = Enum.PartType.Cylinder
+	handle.Size = Vector3.new(0.24, 0.24, 0.24)
+	handle.Transparency = 1
+	handle.CanCollide = false
+	handle.CanTouch = false
+	handle.CanQuery = false
+	handle.Massless = true
 	handle.TopSurface = Enum.SurfaceType.Smooth
 	handle.BottomSurface = Enum.SurfaceType.Smooth
 	return handle
@@ -99,9 +131,9 @@ local function buildTool(spec: RodCatalog.Rod): Tool
 	tool.RequiresHandle = true
 	tool.CanBeDropped = false
 	tool.ToolTip = spec.name
-	tool.Grip = CFrame.new(0, 0, -1.5)
+	tool.Grip = CFrame.new(0, -0.08, -0.08)
 
-	local handle = buildHandle("Handle", rgb(spec.handleColor))
+	local handle = buildHandle("Handle")
 	handle.Parent = tool
 	attachAnatomy(handle, tool, spec)
 
@@ -115,7 +147,7 @@ end
 local function buildDisplayModel(spec: RodCatalog.Rod): Model
 	local model = Instance.new("Model")
 	model.Name = spec.id
-	local handle = buildHandle("Handle", rgb(spec.handleColor))
+	local handle = buildHandle("Handle")
 	handle.CFrame = CFrame.new(0, 0, 0)
 	handle.Parent = model
 	model.PrimaryPart = handle

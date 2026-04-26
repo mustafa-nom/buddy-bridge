@@ -4,14 +4,20 @@
 -- player loops back to fishing.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 local UIStyle = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("UIStyle"))
 local IconFactory = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("IconFactory"))
 local UIBuilder = require(script.Parent:WaitForChild("UIBuilder"))
 
 local screen = UIBuilder.GetScreenGui()
+local activeDismiss: (() -> ())? = nil
 
 local function clearOld()
+	if activeDismiss then
+		activeDismiss()
+		activeDismiss = nil
+	end
 	local old = screen:FindFirstChild("PhishResultPanel")
 	if old then old:Destroy() end
 end
@@ -23,24 +29,64 @@ local function render(payload: any)
 	local correct = payload.wasCorrect == true
 	local headerColor = correct and UIStyle.Palette.Safe or UIStyle.Palette.Risky
 
+	local dismissed = false
+	local dismissInput: RBXScriptConnection? = nil
+	local dismissLayer = Instance.new("TextButton")
+	dismissLayer.Name = "PhishResultPanel"
+	dismissLayer.Size = UDim2.fromScale(1, 1)
+	dismissLayer.BackgroundTransparency = 1
+	dismissLayer.BorderSizePixel = 0
+	dismissLayer.Text = ""
+	dismissLayer.AutoButtonColor = false
+	dismissLayer.ZIndex = 40
+	dismissLayer.Parent = screen
+
+	local function dismiss()
+		if dismissed then return end
+		dismissed = true
+		if dismissInput then
+			dismissInput:Disconnect()
+			dismissInput = nil
+		end
+		if dismissLayer and dismissLayer.Parent then
+			dismissLayer:Destroy()
+		end
+		if activeDismiss == dismiss then
+			activeDismiss = nil
+		end
+	end
+	activeDismiss = dismiss
+
+	dismissLayer.Activated:Connect(dismiss)
+	dismissInput = UserInputService.InputBegan:Connect(function(input, _gameProcessed)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dismiss()
+		end
+	end)
+
 	local panel = UIStyle.MakePanel({
-		Name = "PhishResultPanel",
+		Name = "Panel",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.fromOffset(520, 380),
 		BackgroundColor3 = UIStyle.Palette.Background,
+		ZIndex = 41,
 	})
-	panel.Parent = screen
+	panel.Parent = dismissLayer
 
 	local header = UIStyle.MakePanel({
 		Size = UDim2.new(1, 0, 0, 64),
 		BackgroundColor3 = headerColor,
 	})
 	header.Parent = panel
-	local headerIcon = correct and IconFactory.Check(36) or IconFactory.Cross(36)
-	IconFactory.Pill(header, headerIcon,
-		correct and "NICE CATCH" or "THAT WAS BAIT",
-		Color3.new(1, 1, 1), UIStyle.TextSize.Title)
+	UIStyle.MakeLabel({
+		Size = UDim2.fromScale(1, 1),
+		Text = correct and "NICE CATCH" or "THAT WAS BAIT",
+		Font = UIStyle.FontBold,
+		TextSize = UIStyle.TextSize.Title,
+		TextColor3 = Color3.new(1, 1, 1),
+	}).Parent = header
 
 	local subtitle = string.format("%s - %s",
 		payload.speciesDisplayName or payload.species or "?",
@@ -143,7 +189,7 @@ local function render(payload: any)
 	end
 
 	task.delay(5, function()
-		if panel and panel.Parent then panel:Destroy() end
+		dismiss()
 	end)
 end
 
