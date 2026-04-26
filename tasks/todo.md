@@ -55,16 +55,16 @@ Build a polished MVP of Buddy Bridge with **2 levels**: Stranger Danger Park and
 
 ## Stranger Danger Park
 
-- [x] `Scenarios/StrangerDangerScenario.lua` — generate exactly 3 Risky NPCs with unique `(Color, Shape)` badges
-- [x] `Levels/StrangerDangerLevel.lua` — clone NPCs, attach badge SurfaceGuis, wire booth slots and submit pad
-- [x] `ExplorerInteractionService.lua` — `RequestInspectNpc` returns behavior cue + badge
-- [x] `GuideControlService.lua` — `RequestSetSlotBadge` + `RequestSubmitAccusation` validators
-- [x] `ExplorerController.client.lua` — handle proximity-based NPC inspect only
-- [x] `NpcDescriptionCardController.client.lua` — show behavior cue + badge to Explorer
-- [x] `GuideManualController.client.lua` — manual default-closed with toggle button
-- [x] `GuideBoothController.client.lua` — slot picker UI + per-slot display from `BoothStateUpdated`
-- [x] Visual: NPC badge SurfaceGui + booth slot/attempt SurfaceGuis
-- [x] Submit loop: green slots lock, red slots stay editable, 3 failed submits ends round
+- [x] `Scenarios/StrangerDangerScenario.lua` — generate randomized NPC scenario with anchor bias
+- [x] `Levels/StrangerDangerLevel.lua` — clone NPCs, attach traits, attach knife accessory
+- [x] `ExplorerInteractionService.lua` — `RequestInspectNpc`, `RequestTalkToNpc`
+- [x] `GuideControlService.lua` — `RequestAnnotateNpc`
+- [x] `ExplorerController.client.lua` — handle proximity-based NPC inspect, talk follow-up
+- [x] `NpcDescriptionCardController.client.lua` — show trait card to Explorer + colored ring on annotation
+- [x] `GuideManualController.client.lua` — render trait/risk manual on booth SurfaceGui (with screen-space fallback)
+- [x] `GuideAnnotationController.client.lua` — annotation buttons
+- [x] Visual: colored ring around NPC when Guide annotates
+- [x] Quest: 3 clues → puppy spawn → level exit
 - [ ] Test: full level playthrough with 2 players (HUMAN — needs Studio)
 
 ## Backpack Checkpoint
@@ -102,11 +102,58 @@ Build a polished MVP of Buddy Bridge with **2 levels**: Stranger Danger Park and
 
 ## Verification
 
-- [ ] `selene src/` passes (BLOCKED locally — `selene` not on PATH; `aftman install` requires trusting `Kampfkarren/selene`)
-- [x] All files in `src/` under 500 lines (max: 397)
+- [ ] `selene src/` passes (HUMAN — selene not installed locally)
+- [x] All files in `src/` under 500 lines (max: 472, BookView.lua, untouched)
 - [x] All remotes validate input + role (canonical chain in Helpers/RemoteValidation)
 - [x] No client-side authoritative gameplay state
 - [ ] Tested with 2 players in Studio local server (HUMAN)
 - [ ] Tested 4 simultaneous duos do not cross-talk (HUMAN — annotation state lives on round.ActiveScenario, all FireClient is scoped via FirePair)
 - [x] `tasks/todo.md` updated
 - [x] `tasks/lessons.md` updated
+
+## Backpack Checkpoint V1 — P0 / P1 (shipped)
+
+Per `docs/BACKPACK_CHECKPOINT_DECISION.md` + V1 PRD + edge-case addendum.
+
+### P0 (waves, belt, basic Guide tools)
+
+- [x] 3 waves of 6 / 8 / 10 items, tier-gated (Tier 3 only in Wave 3).
+- [x] BeltController split into `Levels/BackpackCheckpoint/{BeltController, WaveDirector}.lua`.
+- [x] Bounce-back on wrong sort (–25% belt length, lanes re-arm).
+- [x] Fall-off timer → `AddMistake("Fallthrough")` + combo break.
+- [x] Per-item lane locks. Locked-lane sort attempts rejected with soft buzzer.
+- [x] ScannerService remotes: `RequestScanItem` (per-wave cap, cooldown, cached), `RequestHighlightItem` (last-write-wins), `RequestUnlockLane` (mutually exclusive).
+- [x] Annotation system removed from BPC: `RequestAnnotateItem`, `ItemAnnotationUpdated` deleted; SD `RequestAnnotateNpc` retained.
+- [x] Pixel Post intro slide (non-gating P0 — fades after 5s).
+
+### P1 (combo, Veto, Mini-Boss, Scanner Guide HUD)
+
+- [x] Combo multipliers in `ScoringConfig` — 3 → ×1.5, 5 → ×2.0; multiplier applies only to per-sort base trust points; level/perfect bonuses unaffected.
+- [x] `ScoringService.AddTrustPoints(round, amount, reason, multiplier)` accepts an optional multiplier; `ScoringService.ReduceStreak(round, divisor)` for Veto cost.
+- [x] Veto: `RequestVeto` remote, one charge per round, 3s belt freeze (re-locks all lanes, pauses fall-off timer), halves combo; allowed during Mini-Boss; HUD reflects used/active state.
+- [x] Mini-Boss `MiniBossDirector.lua`: triggered after Wave 3 drains, 3 inner items sequential, belt halted, all 3 inner labels+tags revealed at start, fail-on-high-combo (≥5) → `EndRound("MiniBossFail")`, below threshold → AddMistake + bag continues, success → `MiniBossSuccessBonus`.
+- [x] `ScannerGuideHud.client.lua`: X-ray feed (label + scan tags), Highlight (G/Y/R), Lane Unlock (Pack/Ask/Leave), Scan w/ counter, Veto button. Reflects wave + Mini-Boss state.
+- [x] All round-scoped state on `round.LevelState[BackpackCheckpoint]`; no module-level mutable BPC state.
+
+### P1 manual smoke test (HUMAN — 2-player Studio)
+
+- [ ] Wave 1 happy path: Pixel Post intro plays both screens; first item spawns; Guide scans/highlights/unlocks; Explorer sorts; combo bar ticks.
+- [ ] Wrong sort with Streak <3: combo resets, item bounces back to belt –25%, mistake counter increments.
+- [ ] Reach Streak ≥3: next correct sort awards ×1.5 trust points (Notify shows Multiplier=1.5).
+- [ ] Reach Streak ≥5: next correct sort awards ×2.0.
+- [ ] Veto: press Veto button mid-item; lanes re-lock; 3s freeze countdown; combo halves; button disables for rest of round.
+- [ ] Mini-Boss: complete all 3 waves; bag arrives; sort all 3 inner items correctly → success bonus + level complete.
+- [ ] Mini-Boss fail: build Streak ≥5, then deliberately wrong-sort an inner item → round ends with `MiniBossFail`, kid-friendly toast appears, score screen still renders.
+- [ ] Mini-Boss below threshold: with Streak <5, wrong-sort an inner item → AddMistake, bag continues with next inner.
+- [ ] **SD regression smoke** (per addendum): play one Stranger Danger round; verify NPC annotation buttons still work (`RequestAnnotateNpc` → ring colors), no `RemoteService` "remote not found" warnings.
+- [ ] PartnerLeft cleanup: have one player close their client mid-wave or mid-Mini-Boss; verify the round ends cleanly, no orphaned models, slot is released.
+
+### P2 (shipped)
+
+- [x] Gated Pixel Post intro: server tracks `IntroDismissedBy`; Wave 1 spawn waits until both dismiss OR `BACKPACK_INTRO_GATE_TIMEOUT_SECONDS` (30s). Continue button surfaces after 3s on the slide.
+- [x] Field Manual session meta: `DataService.EncounteredItems` per player. `BeltController.SpawnItem` calls `MarkItemEncountered`; `BackpackCheckpointLevel.Begin` pushes the union via `FieldManualUpdated`. `BackpackCheckpointManual` adds `MarkSeen` / `MarkAllSeen`; `GuideManualController` listens.
+- [x] Rehydrate on Guide respawn: `GuideRehydrate.lua` re-fires `WaveStarted` / `ConveyorItemSpawned` / `ScannerOverlayUpdated` / `LaneLockUpdated` / `HighlightUpdated` / `VetoActivated+Ended` / `MiniBoss*` / `FieldManualUpdated` to the one client.
+- [x] Drop-not-bin recovery: Explorer Humanoid.Died handler clears `HeldByPlayer`. The fall-off timer is unchanged so a benign drop still risks a fall-off mistake (P2 polish to skip the fall-off on death is deferred).
+- [x] Tutorial gating: `DataService.HasSeenTutorial` is sub-tabled by key (`BackpackCheckpointGuide` / `BackpackCheckpointExplorer`). Server fires `TutorialPrompt` on first BPC level start per role per session. Client overlay in `TutorialPromptController.client.lua` auto-fades after 8s.
+
+See `docs/BACKPACK_CHECKPOINT_P1P2.md` for the full Studio test checklist and out-of-scope list.
