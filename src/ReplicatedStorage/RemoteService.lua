@@ -16,6 +16,7 @@ RemoteService.Events = {
 	"RequestReelTap",        -- player taps during reel mini-game
 	"SubmitDecision",        -- KEEP / CUT_BAIT ({ decision = "KEEP" | "CUT_BAIT" })
 	"RequestOpenPhishDex",   -- player opens dex screen
+	"RequestPurchaseRod",    -- shop purchase ({ rodId = string })
 
 	-- Server → Client
 	"RodGranted",            -- ack that rod is in player's backpack
@@ -31,6 +32,7 @@ RemoteService.Events = {
 	"PhishermanArrived",     -- boss event start
 	"PhishermanDefeated",    -- boss event end
 	"LeaderboardUpdated",    -- snapshot for Board of Fame
+	"PurchaseResult",        -- { ok, message, rodId, newCoins, newRodTier }
 	"Notify",                -- generic toast
 }
 

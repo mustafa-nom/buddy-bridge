@@ -15,6 +15,7 @@ export type Profile = {
 	unlockedSpecies: { [string]: number },        -- speciesId -> catch count
 	civicXP: number,
 	rodGiven: boolean,
+	rodTier: number,                              -- 1..4; gates which water tiles you can fish
 	tutorialFlags: { [string]: boolean },          -- one-shot UI hints already shown
 }
 
@@ -32,8 +33,17 @@ local function newProfile(): Profile
 		unlockedSpecies = {},
 		civicXP = 0,
 		rodGiven = false,
+		rodTier = 1,                       -- starter rod
 		tutorialFlags = {},
 	}
+end
+
+-- Bump the player's rod tier (1..4). Useful for testing — call from the
+-- Studio Server Command Bar:
+--   require(game.ServerScriptService.Services.DataService).SetRodTier(game.Players.YourName, 4)
+function DataService.SetRodTier(player: Player, tier: number)
+	local profile = DataService.Get(player)
+	profile.rodTier = math.clamp(math.floor(tier), 1, 4)
 end
 
 function DataService.MarkTutorial(player: Player, key: string): boolean
@@ -69,6 +79,7 @@ function DataService.Snapshot(player: Player): { [string]: any }
 		role = p.role,
 		unlockedSpecies = p.unlockedSpecies,
 		civicXP = p.civicXP,
+		rodTier = p.rodTier,
 	}
 end
 
