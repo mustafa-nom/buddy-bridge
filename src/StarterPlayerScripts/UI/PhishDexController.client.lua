@@ -83,8 +83,20 @@ local function buildFishPreview(speciesId: string, found: boolean, parent: Insta
 end
 
 local open: () -> ()
+local tutorialComplete = false
+
+local function setVisible(visible: boolean)
+	local indexBtn = screen:FindFirstChild("FishIndexButton")
+	if indexBtn and indexBtn:IsA("GuiObject") then
+		indexBtn.Visible = visible
+	end
+	if not visible then
+		clearOld()
+	end
+end
 
 local function toggle()
+	if not tutorialComplete then return end
 	if screen:FindFirstChild("PhishDex") then
 		clearOld()
 	else
@@ -232,6 +244,12 @@ open = function()
 	end
 end
 
+RemoteService.OnClientEvent("HudUpdated", function(snapshot)
+	if type(snapshot) ~= "table" then return end
+	tutorialComplete = snapshot.tutorialComplete == true
+	setVisible(tutorialComplete)
+end)
+
 local indexBtn = UIStyle.MakeButton({
 	Name = "FishIndexButton",
 	AnchorPoint = Vector2.new(1, 0),
@@ -244,6 +262,7 @@ local indexBtn = UIStyle.MakeButton({
 	TextColor3 = Color3.fromRGB(60, 40, 10),
 	Parent = screen,
 })
+indexBtn.Visible = false
 UIStyle.ApplyStroke(indexBtn, Color3.fromRGB(120, 80, 20), 2)
 UIStyle.ApplyGradient(indexBtn, {
 	top = Color3.fromRGB(255, 220, 120),
@@ -252,6 +271,8 @@ UIStyle.ApplyGradient(indexBtn, {
 })
 UIStyle.BindHover(indexBtn, 1.06)
 indexBtn.MouseButton1Click:Connect(toggle)
+
+setVisible(tutorialComplete)
 
 UserInputService.InputBegan:Connect(function(input, gpe)
 	if gpe then return end

@@ -82,6 +82,7 @@ local coinsLabel = makePill("CoinsChip",
 coinsLabel.TextColor3 = UIStyle.Palette.TitleGold
 coinsLabel.Font = UIStyle.FontDisplay
 coinsLabel.TextSize = UIStyle.TextSize.Heading
+coinsLabel.Visible = false
 
 local levelLabel = makePill("LevelChip",
 	Vector2.new(1, 0), UDim2.new(1, -16, 0, 60),
@@ -89,6 +90,7 @@ local levelLabel = makePill("LevelChip",
 	nil)
 levelLabel.TextColor3 = UIStyle.Palette.TextPrimary
 levelLabel.Font = UIStyle.FontBold
+levelLabel.Visible = false
 
 -- TOP-LEFT: accuracy chip (kept for parity with previous HUD).
 local accuracyLabel = makePill("AccuracyChip",
@@ -100,6 +102,10 @@ accuracyLabel.Font = UIStyle.FontBold
 
 local function render(snapshot: any)
 	if not snapshot then return end
+	local tutorialComplete = snapshot.tutorialComplete == true
+	coinsLabel.Visible = tutorialComplete
+	levelLabel.Visible = tutorialComplete
+
 	coinsLabel.Text = string.format("%d C$", snapshot.coins or 0)
 
 	local acc = snapshot.accuracy or 0

@@ -140,6 +140,7 @@ local function onSubmitDecision(player: Player, payload: any)
 	profile.coins = math.max(0, profile.coins + flagScore.coinsDelta)
 	profile.xp = math.max(0, profile.xp + flagScore.xpDelta)
 	local levelResult = LevelService.HandleXpChanged(player, xpBefore, profile.xp)
+	DataService.MarkTutorial(player, "CoreTutorialComplete")
 	-- Refresh HUD with the flag-adjusted totals.
 	ScoringService.PushHud(player)
 

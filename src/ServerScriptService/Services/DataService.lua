@@ -190,6 +190,7 @@ function DataService.Snapshot(player: Player): { [string]: any }
 		ownedGear = p.ownedGear,
 		civicXP = p.civicXP,
 		rodTier = p.rodTier,
+		tutorialComplete = p.tutorialFlags["CoreTutorialComplete"] == true,
 	}
 end
 
