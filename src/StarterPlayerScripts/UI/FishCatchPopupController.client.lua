@@ -42,13 +42,15 @@ local function rarityColor(rarity: string?): Color3
 	return (rarity and rarityColors[rarity]) or UIStyle.Palette.Common
 end
 
-type Variant = "Found" | "Mastered"
+type Variant = "Found" | "Caught" | "Mastered"
 
 type PopupPayload = {
 	id: string,
 	displayName: string,
 	rarity: string?,
 	variant: Variant,
+	count: number?,
+	catchesToUnlock: number?,
 }
 
 local queue: { PopupPayload } = {}
@@ -60,16 +62,30 @@ local function clearAny()
 end
 
 local function buildBanner(parent: Instance, variant: Variant): Frame
-	local isMastered = variant == "Mastered"
-	local label = isMastered and "MASTERED!" or "NEW!"
-	local bgColor = isMastered and UIStyle.Palette.TitleGoldHero or UIStyle.Palette.AskFirst
-	local strokeColor = isMastered and UIStyle.Palette.BannerStroke or Color3.fromRGB(140, 90, 20)
+	local label, bgColor, strokeColor, width, textSize, textColor
+
+	if variant == "Mastered" then
+		label, width, textSize = "MASTERED!", 130, 20
+		bgColor = UIStyle.Palette.TitleGoldHero
+		strokeColor = UIStyle.Palette.BannerStroke
+		textColor = Color3.fromRGB(60, 36, 8)
+	elseif variant == "Found" then
+		label, width, textSize = "NEW!", 86, 22
+		bgColor = UIStyle.Palette.AskFirst
+		strokeColor = Color3.fromRGB(140, 90, 20)
+		textColor = Color3.fromRGB(60, 36, 8)
+	else  -- Caught (routine)
+		label, width, textSize = "CAUGHT", 96, 18
+		bgColor = UIStyle.Palette.CardSlot
+		strokeColor = UIStyle.Palette.SlotStroke
+		textColor = UIStyle.Palette.TextPrimary
+	end
 
 	local banner = Instance.new("Frame")
 	banner.Name = "Banner"
 	banner.AnchorPoint = Vector2.new(0, 0)
 	banner.Position = UDim2.new(0, -10, 0, -14)
-	banner.Size = UDim2.fromOffset(isMastered and 130 or 86, 32)
+	banner.Size = UDim2.fromOffset(width, 32)
 	banner.BackgroundColor3 = bgColor
 	banner.BorderSizePixel = 0
 	banner.ZIndex = 6
@@ -81,16 +97,19 @@ local function buildBanner(parent: Instance, variant: Variant): Frame
 		Size = UDim2.fromScale(1, 1),
 		Text = label,
 		Font = UIStyle.FontDisplay,
-		TextSize = isMastered and 20 or 22,
-		TextColor3 = Color3.fromRGB(60, 36, 8),
+		TextSize = textSize,
+		TextColor3 = textColor,
 		ZIndex = 7,
 		Parent = banner,
 	})
-	local txtStroke = Instance.new("UIStroke")
-	txtStroke.Color = Color3.fromRGB(255, 250, 220)
-	txtStroke.Thickness = 1.2
-	txtStroke.Transparency = 0.4
-	txtStroke.Parent = txt
+	-- Cream emboss stroke only for the gold banners.
+	if variant ~= "Caught" then
+		local txtStroke = Instance.new("UIStroke")
+		txtStroke.Color = Color3.fromRGB(255, 250, 220)
+		txtStroke.Thickness = 1.2
+		txtStroke.Transparency = 0.4
+		txtStroke.Parent = txt
+	end
 
 	return banner
 end
@@ -180,17 +199,35 @@ local function buildCard(payload: PopupPayload): Frame
 		Parent = card,
 	})
 
+	-- Bottom row: rarity on the left, optional catch progress on the right
+	-- (only shown for routine "CAUGHT" variants where it's useful info).
 	UIStyle.MakeLabel({
 		Name = "Rarity",
-		Size = UDim2.new(1, -16, 0, 18),
+		Size = UDim2.new(0.5, -12, 0, 18),
 		Position = UDim2.fromOffset(8, CARD_HEIGHT - 32),
 		Text = string.upper(payload.rarity or "Common"),
 		Font = UIStyle.FontBold,
 		TextSize = UIStyle.TextSize.Caption,
 		TextColor3 = rar,
+		TextXAlignment = Enum.TextXAlignment.Left,
 		ZIndex = 5,
 		Parent = card,
 	})
+
+	if payload.variant == "Caught" and payload.count and payload.catchesToUnlock then
+		UIStyle.MakeLabel({
+			Name = "Progress",
+			Size = UDim2.new(0.5, -12, 0, 18),
+			Position = UDim2.new(0.5, 4, 0, CARD_HEIGHT - 32),
+			Text = string.format("%d / %d", payload.count, payload.catchesToUnlock),
+			Font = UIStyle.FontBold,
+			TextSize = UIStyle.TextSize.Caption,
+			TextColor3 = UIStyle.Palette.TextMuted,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			ZIndex = 5,
+			Parent = card,
+		})
+	end
 
 	return card
 end
@@ -209,7 +246,10 @@ local function show(payload: PopupPayload)
 	slideIn:Play()
 	slideIn.Completed:Wait()
 
-	task.wait(HOLD_TIME)
+	-- Routine "CAUGHT" cards hold for less time so they don't feel
+	-- punishing on a streak of catches.
+	local holdSec = (payload.variant == "Caught") and 1.6 or HOLD_TIME
+	task.wait(holdSec)
 
 	if not card.Parent then return end
 	local slideOut = TweenService:Create(card,
@@ -260,12 +300,18 @@ local function enqueue(variant: Variant, payload: any)
 		displayName = payload.displayName or payload.id,
 		rarity = payload.rarity,
 		variant = variant,
+		count = payload.count,
+		catchesToUnlock = payload.catchesToUnlock,
 	})
 	pumpQueue()
 end
 
 RemoteService.OnClientEvent("SpeciesFound", function(payload)
 	enqueue("Found", payload)
+end)
+
+RemoteService.OnClientEvent("SpeciesCaught", function(payload)
+	enqueue("Caught", payload)
 end)
 
 RemoteService.OnClientEvent("SpeciesUnlocked", function(payload)

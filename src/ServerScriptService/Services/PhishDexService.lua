@@ -73,16 +73,21 @@ function PhishDexService.RecordCatch(player: Player, speciesId: string)
 	local species = PhishDex.Get(speciesId)
 	if not species then return end
 
+	-- Track whether this is the player's first time on this species so we
+	-- can pick the right popup variant (Found vs Caught) below.
+	local profile = DataService.Get(player)
+	local wasFirstCatch = not profile.foundSpecies[speciesId]
+
 	-- Funnel the "first encounter" bookkeeping through RecordFound so the
 	-- SpeciesFound popup fires exactly once per profile.
 	PhishDexService.RecordFound(player, speciesId)
 
-	local profile = DataService.Get(player)
 	local prev = profile.unlockedSpecies[speciesId] or 0
 	local next_ = prev + 1
 	profile.unlockedSpecies[speciesId] = next_
 
-	if prev < species.catchesToUnlock and next_ >= species.catchesToUnlock then
+	local crossedMastery = prev < species.catchesToUnlock and next_ >= species.catchesToUnlock
+	if crossedMastery then
 		RemoteService.FireClient(player, "SpeciesUnlocked", {
 			id = species.id,
 			displayName = species.displayName,
@@ -90,6 +95,16 @@ function PhishDexService.RecordCatch(player: Player, speciesId: string)
 			realPatternName = species.realPatternName,
 			realWorldInfo = species.realWorldInfo,
 			defenseStrategy = species.defenseStrategy,
+		})
+	elseif not wasFirstCatch then
+		-- Routine catch (not first, not mastery): fire the lighter "CAUGHT"
+		-- popup so the player gets feedback every time.
+		RemoteService.FireClient(player, "SpeciesCaught", {
+			id = species.id,
+			displayName = species.displayName,
+			rarity = species.rarity,
+			count = next_,
+			catchesToUnlock = species.catchesToUnlock,
 		})
 	end
 end

@@ -39,7 +39,8 @@ RemoteService.Events = {
 	"LineSnapped",           -- legacy line failure compatibility
 	"HudUpdated",            -- coins / accuracy / role / xp
 	"SpeciesFound",          -- popup: first time a species is caught
-	"SpeciesUnlocked",       -- toast: new dex entry unlocked
+	"SpeciesCaught",         -- popup: every subsequent catch of a known species
+	"SpeciesUnlocked",       -- toast: new dex entry unlocked (mastered)
 	"PhishermanArrived",     -- boss event start
 	"PhishermanDefeated",    -- boss event end
 	"LeaderboardUpdated",    -- snapshot for Board of Fame
