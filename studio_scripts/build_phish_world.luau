@@ -340,6 +340,7 @@ local function buildBoat(map)
 	driver.Size = V3(2, 0.5, 2)
 	driver.Color = C3(180, 60, 60)
 	driver.CFrame = CF(origin + V3(2, 0.75, 0))
+	pcall(function() driver.HeadsUpDisplay = false end)
 	driver.Parent = boat
 	tag(driver, "PhishBoatSeat")
 	attr(driver, "IsDriver", true)
