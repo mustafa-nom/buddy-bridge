@@ -60,11 +60,16 @@ function PhishDexService.RecordFound(player: Player, speciesId: string)
 	end
 
 	-- One-shot popup the first time a player ever sees this species.
+	-- Include count/catchesToUnlock so the popup can show "1 / 50" style
+	-- progress, matching the routine "CAUGHT" cards.
+	local count = (profile.unlockedSpecies[speciesId] or 0) + 1
 	RemoteService.FireClient(player, "SpeciesFound", {
 		id = species.id,
 		displayName = species.displayName,
 		rarity = species.rarity,
 		isLegit = species.isLegit,
+		count = count,
+		catchesToUnlock = species.catchesToUnlock,
 	})
 end
 
