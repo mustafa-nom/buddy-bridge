@@ -1,7 +1,9 @@
 --!strict
 -- Owns the rod Tool. Players hit the NPC angler ProximityPrompt → server
--- builds a Rod Tool and parents it to their Backpack. The rod's LocalScript
--- fires "RequestCast" on Activated.
+-- builds a Rod Tool and parents it to their Backpack. Cast input is bound
+-- on the *client* side (StarterPlayerScripts/Angler/RodInputController.client.lua)
+-- by listening for tools tagged "PhishRod" — Roblox no longer lets us write
+-- LocalScript.Source from a server script.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -50,23 +52,10 @@ local function buildRod(): Tool
 	weld.Part0 = handle; weld.Part1 = tip; weld.Parent = handle
 	tip.CFrame = handle.CFrame * CFrame.new(0, 2, 0)
 
-	-- Tool LocalScript: forwards Activated → RequestCast remote. Uses Player
-	-- mouse target as aim.
-	local local_ = Instance.new("LocalScript")
-	local_.Name = "PhishRodClient"
-	local_.Source = [[
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
-local tool = script.Parent
-local player = Players.LocalPlayer
-tool.Activated:Connect(function()
-    local mouse = player:GetMouse()
-    local aim = mouse.Hit and mouse.Hit.Position or Vector3.new()
-    RemoteService.FireServer("RequestCast", aim)
-end)
-]]
-	local_.Parent = tool
+	-- Tag + attribute so the client-side input controller picks it up. We
+	-- can no longer inject a LocalScript.Source at runtime (Roblox sandbox).
+	tool:SetAttribute("PhishRod", true)
+	CollectionService:AddTag(tool, ROD_TOOL_NAME)
 	return tool
 end
 
