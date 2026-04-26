@@ -2,6 +2,7 @@
 -- Top HUD: coins, accuracy %, level/XP. Dark themed pill chips.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 
 local UIStyle = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("UIStyle"))
@@ -9,6 +10,8 @@ local IconFactory = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChi
 local UIBuilder = require(script.Parent:WaitForChild("UIBuilder"))
 
 local screen = UIBuilder.GetScreenGui()
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
 local existing = screen:FindFirstChild("PhishHud")
 if existing then existing:Destroy() end
@@ -26,6 +29,13 @@ local function setPillVisible(label: TextLabel, visible: boolean)
 	if chip and chip:IsA("GuiObject") then
 		chip.Visible = visible
 	end
+end
+
+local function isTutorialOverlayActive(): boolean
+	local tutorialGui = playerGui:FindFirstChild("PhishTutorialGui")
+	if not tutorialGui or not tutorialGui:IsA("ScreenGui") then return false end
+	return tutorialGui:FindFirstChild("PhishTutorialBanner") ~= nil
+		or tutorialGui:FindFirstChild("PhishTutorialChip") ~= nil
 end
 
 -- Build a dark pill chip with optional left-side icon.
@@ -108,11 +118,18 @@ local accuracyLabel = makePill("AccuracyChip",
 accuracyLabel.TextColor3 = UIStyle.Palette.Highlight
 accuracyLabel.Font = UIStyle.FontBold
 
+local snapshotTutorialComplete = false
+
+local function applyHudVisibility()
+	local show = snapshotTutorialComplete and not isTutorialOverlayActive()
+	setPillVisible(coinsLabel, show)
+	setPillVisible(levelLabel, show)
+end
+
 local function render(snapshot: any)
 	if not snapshot then return end
-	local tutorialComplete = snapshot.tutorialComplete == true
-	setPillVisible(coinsLabel, tutorialComplete)
-	setPillVisible(levelLabel, tutorialComplete)
+	snapshotTutorialComplete = snapshot.tutorialComplete == true
+	applyHudVisibility()
 
 	coinsLabel.Text = string.format("%d C$", snapshot.coins or 0)
 
@@ -136,6 +153,15 @@ RemoteService.OnClientEvent("HudUpdated", render)
 task.spawn(function()
 	local ok, snapshot = pcall(function() return RemoteService.InvokeServer("GetPlayerSnapshot") end)
 	if ok then render(snapshot) end
+end)
+
+-- Tutorial UI can appear/disappear without a HudUpdated packet (e.g. replaying
+-- tutorial on an existing profile), so keep chip visibility in sync.
+task.spawn(function()
+	while hud.Parent do
+		applyHudVisibility()
+		task.wait(0.2)
+	end
 end)
 
 -- Generic notify toasts.

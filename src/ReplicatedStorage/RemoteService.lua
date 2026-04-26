@@ -25,6 +25,7 @@ RemoteService.Events = {
 	"RequestDeployGear",     -- deploy owned gear ({ gearId = string, target = Vector3 })
 	"RequestSellAllFish",    -- sell every caught fish tool in backpack/character
 	"RequestDebugCoins",     -- test shortcut: grant coins while iterating locally
+	"MarkTutorialComplete",  -- client says the first-run tutorial fully finished
 
 	-- Server → Client
 	"RodGranted",            -- ack that rod is in player's backpack

@@ -211,6 +211,13 @@ function DataService.OnSaved(callback: (Player, Profile) -> ())
 end
 
 function DataService.Init()
+	RemoteService.OnServerEvent("MarkTutorialComplete", function(player)
+		local profile = DataService.Get(player)
+		if profile.tutorialFlags["CoreTutorialComplete"] then return end
+		profile.tutorialFlags["CoreTutorialComplete"] = true
+		DataService.Save(player)
+	end)
+
 	Players.PlayerAdded:Connect(function(player)
 		local profile, fromStore = loadProfile(player)
 		profiles[player] = profile

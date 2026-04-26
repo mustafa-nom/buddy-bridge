@@ -41,6 +41,7 @@ local beamTargetAttachment: Attachment? = nil
 local sawCastFirst = false
 local sawDecisionFirst = false
 local minimized = false
+local tutorialCompleteSent = false
 
 -- Banner content for the currently shown stage (so re-expand can rebuild it).
 local currentTitle = ""
@@ -392,6 +393,10 @@ local function gotoStage3()
 end
 
 local function tutorialDone()
+	if not tutorialCompleteSent then
+		tutorialCompleteSent = true
+		RemoteService.FireServer("MarkTutorialComplete")
+	end
 	clearBanner()
 	clearChip()
 	clearArrow()
