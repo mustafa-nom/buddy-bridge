@@ -23,14 +23,15 @@ local function makeLaneSection(parent: Frame, lane: string, items: { string }): 
 	local theme = ItemRegistry.LaneTheme[lane]
 	local section = Instance.new("Frame")
 	section.Name = "Lane_" .. lane
-	section.Size = UDim2.new(1, 0, 0, 24 + (#items * 24))
+	local rowScale = 1 / math.max(#items + 1, 1)
+	section.Size = UDim2.fromScale(1, math.min(0.29, 0.055 + (#items * 0.042)))
 	section.BackgroundTransparency = 1
 	section.LayoutOrder = #parent:GetChildren()
 	section.Parent = parent
 
 	local layout = Instance.new("UIListLayout")
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 2)
+	layout.Padding = UDim.new(0.01, 0)
 	layout.Parent = section
 
 	local prefix = "⛔ "
@@ -40,7 +41,7 @@ local function makeLaneSection(parent: Frame, lane: string, items: { string }): 
 		prefix = "⚠️ "
 	end
 	local header = UIStyle.MakeLabel({
-		Size = UDim2.new(1, 0, 0, 22),
+		Size = UDim2.fromScale(1, rowScale),
 		Text = prefix .. theme.Label,
 		TextSize = UIStyle.TextSize.Body,
 		TextColor3 = theme.Color,
@@ -53,7 +54,7 @@ local function makeLaneSection(parent: Frame, lane: string, items: { string }): 
 	for i, key in ipairs(items) do
 		local row = Instance.new("Frame")
 		row.Name = "Row_" .. key
-		row.Size = UDim2.new(1, 0, 0, 22)
+		row.Size = UDim2.fromScale(1, rowScale)
 		row.BackgroundColor3 = UIStyle.Palette.Panel
 		row.BorderSizePixel = 0
 		row.LayoutOrder = i + 1
@@ -61,8 +62,8 @@ local function makeLaneSection(parent: Frame, lane: string, items: { string }): 
 		UIStyle.ApplyCorner(row, UDim.new(0, 4))
 
 		local label = UIStyle.MakeLabel({
-			Size = UDim2.new(1, -8, 1, 0),
-			Position = UDim2.new(0, 8, 0, 0),
+			Size = UDim2.fromScale(0.96, 1),
+			Position = UDim2.fromScale(0.04, 0),
 			Text = ScenarioRegistry.GetItemDisplay(key),
 			TextSize = UIStyle.TextSize.Caption,
 			TextXAlignment = Enum.TextXAlignment.Left,
@@ -82,7 +83,7 @@ function BackpackCheckpointManual.Build(parent: Instance, manualPayload): Manual
 
 	local frame = Instance.new("Frame")
 	frame.Name = "BB_Manual"
-	frame.Size = UDim2.new(1, 0, 1, 0)
+	frame.Size = UDim2.fromScale(1, 1)
 	frame.BackgroundColor3 = UIStyle.Palette.Background
 	frame.BorderSizePixel = 0
 	frame.Parent = parent
@@ -90,17 +91,17 @@ function BackpackCheckpointManual.Build(parent: Instance, manualPayload): Manual
 
 	local layout = Instance.new("UIListLayout")
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 6)
+	layout.Padding = UDim.new(0.012, 0)
 	layout.Parent = frame
 	local pad = Instance.new("UIPadding")
-	pad.PaddingTop = UDim.new(0, 8)
-	pad.PaddingBottom = UDim.new(0, 8)
-	pad.PaddingLeft = UDim.new(0, 8)
-	pad.PaddingRight = UDim.new(0, 8)
+	pad.PaddingTop = UDim.new(0.02, 0)
+	pad.PaddingBottom = UDim.new(0.02, 0)
+	pad.PaddingLeft = UDim.new(0.02, 0)
+	pad.PaddingRight = UDim.new(0.02, 0)
 	pad.Parent = frame
 
 	local title = UIStyle.MakeLabel({
-		Size = UDim2.new(1, 0, 0, 32),
+		Size = UDim2.fromScale(1, 0.08),
 		Text = "Backpack Checkpoint Chart",
 		TextSize = UIStyle.TextSize.Heading,
 	})
@@ -125,8 +126,8 @@ function BackpackCheckpointManual.Build(parent: Instance, manualPayload): Manual
 	local seenDots: { [string]: TextLabel } = {}
 	for key, row in pairs(allRows) do
 		local dot = UIStyle.MakeLabel({
-			Size = UDim2.new(0, 18, 1, 0),
-			Position = UDim2.new(1, -22, 0, 0),
+			Size = UDim2.fromScale(0.06, 1),
+			Position = UDim2.fromScale(0.94, 0),
 			Text = "•",
 			TextSize = UIStyle.TextSize.Heading,
 			TextColor3 = UIStyle.Palette.PanelStroke,

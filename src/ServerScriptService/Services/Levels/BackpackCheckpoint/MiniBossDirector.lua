@@ -36,7 +36,7 @@ end
 -- possible; if the registry is exhausted, fall back to any.
 local function pickInnerItems(usedKeys: { [string]: boolean }): { string }
 	local pool: { string } = {}
-	for key, info in pairs(ItemRegistry.Items) do
+	for key in pairs(ItemRegistry.Items) do
 		if not usedKeys[key] then
 			-- Bias: tier 2/3 + Mixed/Phishing categories preferred, but include
 			-- tier 1 too if needed.

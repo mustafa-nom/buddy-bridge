@@ -5,7 +5,6 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
-local RunService = game:GetService("RunService")
 
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 local Modules = ReplicatedStorage:WaitForChild("Modules")

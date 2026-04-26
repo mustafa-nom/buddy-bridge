@@ -60,9 +60,13 @@ end
 -- a mistake event because the player didn't make a mistake — they spent a
 -- tool on purpose.
 function ScoringService.ReduceStreak(round, divisor: number?)
-	if not round or not round.IsActive then return end
+	if not round or not round.IsActive then
+		return
+	end
 	local d = divisor or 2
-	if d < 1 then d = 1 end
+	if d < 1 then
+		d = 1
+	end
 	round.Streak = math.floor((round.Streak or 0) / d)
 	pushScoreUpdate(round)
 end

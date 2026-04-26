@@ -21,10 +21,6 @@ local slots: { Model } = {}
 local reservations: { [number]: boolean } = {}
 local roundFootprints: { [string]: { Slot: Model, BoothModel: Model?, BoothSeal: BasePart?, RespawnConnections: { RBXScriptConnection }, HeartbeatConnection: RBXScriptConnection? } } = {}
 
-local function findChildByTagInside(root: Instance, tag: string): Instance?
-	return TagQueries.FirstTaggedInside(root, tag)
-end
-
 local function findLevelByType(slot: Model, levelType: string): Model?
 	local playArea = slot:FindFirstChild(Constants.SLOT_PLAY_AREA_FOLDER)
 	if not playArea then

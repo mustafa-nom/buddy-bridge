@@ -186,7 +186,7 @@ RemoteService.OnClientEvent("InviteReceived", function(payload)
 	showInvite(payload)
 end)
 
-RemoteService.OnClientEvent("PairAssigned", function(payload)
+RemoteService.OnClientEvent("PairAssigned", function(_payload)
 	clearCapsulePrompt()
 	clearInvitePrompt()
 	UIBuilder.Toast("You're paired up! Pick your role.", 3, "Success")

@@ -53,7 +53,6 @@ local function bulletsFromCues(cueTags: { string }, useGuideText: boolean): { st
 end
 
 local function verdictTip(archetype): string
-	local sample = StrangerDangerLogic.PickCues(archetype, 3)
 	-- since cue choice randomizes per round, the book gives the WORST-case
 	-- read for risky archetypes and BEST-case for safe — in either case the
 	-- duo should read 2-3 cues before deciding.
@@ -192,7 +191,9 @@ local function build(): { any }
 	local pages = buildIntroPages()
 	for _, key in ipairs(ARCHETYPE_ORDER) do
 		local page = buildArchetypePage(key)
-		if page then table.insert(pages, page) end
+		if page then
+			table.insert(pages, page)
+		end
 	end
 	table.insert(pages, buildClueMapPage())
 	return pages

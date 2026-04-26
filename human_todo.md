@@ -32,8 +32,7 @@ Claude should not mark related features complete until the human confirms these 
 - [ ] `PrimaryPart` set
 - [ ] `LevelEntry` part where Explorer spawns
 - [ ] 6–8 `BuddyNpcSpawn` parts each with unique `NpcSpawnId`
-- [ ] 4+ candidate `PuppySpawn` parts
-- [ ] `LevelExit` zone that fires when Explorer reaches the puppy
+- [ ] No puppy/clue exit wiring required; the Guide booth submit pad completes or fails this level
 - [ ] Themed but kid-friendly aesthetic (no horror)
 
 #### BackpackCheckpoint
@@ -46,7 +45,8 @@ Claude should not mark related features complete until the human confirms these 
 ### NPC Templates (in `ServerStorage/NpcTemplates`)
 
 - [ ] At least 6 visually distinct NPC rigs (different outfits — shop worker apron, police uniform, casual park goer, parent with stroller, etc.)
-- [ ] Each NPC has a head-mounted name/trait BillboardGui anchor (User 2 fills text at runtime)
+- [ ] Each NPC rig has `UpperTorso`, `Torso`, `HumanoidRootPart`, or `PrimaryPart` so scripts can attach the runtime badge SurfaceGui
+- [ ] Pose/stage NPC templates so cues read clearly: van leaner waving, hot dog vendor behind counter, ranger confident/helpful, parent with kid, hooded/risky NPC alone, knife/tense NPC kid-friendly and non-gory
 
 ### Item Templates (in `ServerStorage/ItemTemplates`)
 
@@ -56,6 +56,11 @@ Claude should not mark related features complete until the human confirms these 
 ### Booth Template (in `ServerStorage/GuideBooths`)
 
 - [ ] `DefaultBooth` Model with `PrimaryPart`, `GuideSpawn`, `ControlPanel` (with SurfaceGui anchor), and a `Window` (transparent part) facing the play area
+- [ ] Add `GuideCameraAnchor` part in `DefaultBooth`; camera should sit slightly above/behind Guide and look at slot pedestals/manual/submit pad without wall/avatar clipping
+- [ ] 3 slot pedestal BaseParts tagged `BB_BoothSlot`, each with numeric attribute `BB_SlotIndex` = `1`, `2`, or `3`
+- [ ] 1 submit pad BasePart tagged `BB_BoothSubmit`
+- [ ] Visible world labels: `Slot 1`, `Slot 2`, `Slot 3`, and `Submit Accusation`
+- [ ] Make booth larger/cleaner so Guide avatar and walls do not occlude the camera
 - [ ] No door — Guide cannot leave by walking
 
 ### Tags & Attributes Sanity Pass
@@ -68,13 +73,18 @@ Claude should not mark related features complete until the human confirms these 
 
 - [ ] Bright, kid-friendly color palette
 - [ ] Cartoon proportions
+- [ ] Stranger Danger park polish pass: paths, fountain/plaza, hot dog stand, white van area, alley mouth, benches, playground/family area, trees/lamps/signs
 - [ ] Signage at lobby capsules ("Buddy Pair 1", etc.)
-- [ ] SFX placeholders in `SoundService`: `ConfirmPair`, `RoundStart`, `LevelComplete`, `WrongSort`, `CorrectSort`, `ClueCollected`, `RiskyTalk`
+- [ ] SFX placeholders in `SoundService`: `ConfirmPair`, `RoundStart`, `LevelComplete`, `WrongSort`, `CorrectSort`, `RiskyTalk`
+
+## MCP Blocker
+
+- [ ] Roblox MCP execution must be enabled before automated Studio edits can be applied. Current checks: Rojo is running; `robloxstudio` MCP timed out; `rbx-studio`/Studio execution reported `loadstring() is not available` or timed out. Enable Studio/plugin Luau execution/loadstring, then rerun the booth/map/NPC asset pass.
 
 ## Scripting (User 2 — see `prompts/user2_scripting_prompt.md`)
 
 - [ ] All work tracked in `tasks/todo.md`
-- [ ] User 2 must NOT modify the Studio map directly — only the `src/` tree
+- [ ] Studio map edits through MCP remain pending until the MCP execution blocker above is cleared
 
 ## Roblox Settings
 

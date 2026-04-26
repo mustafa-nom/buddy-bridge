@@ -21,21 +21,13 @@ if not screen then
 	screen = Instance.new("ScreenGui")
 	screen.Name = "BuddyBridgeUI"
 	screen.ResetOnSpawn = false
-	screen.IgnoreGuiInset = true
+	screen.IgnoreGuiInset = false
 	screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screen.Parent = playerGui
+else
+	screen.IgnoreGuiInset = false
 end
 
--- Pull initial progression so the lobby treehouse can render immediately.
-task.spawn(function()
-	local ok, progression = pcall(RemoteService.InvokeServer, "GetProgression")
-	if ok and progression then
-		-- The LobbyProgressionController listens for ProgressionUpdated; we
-		-- just fire the event manually by pretending the server sent it.
-		-- The server also sends it after PlayerAdded settles, so this is a
-		-- safety net.
-		_G.BuddyBridge_InitialProgression = progression
-	end
-end)
+local _ = RemoteService
 
 print("[BuddyBridge] Client bootstrap ready.")

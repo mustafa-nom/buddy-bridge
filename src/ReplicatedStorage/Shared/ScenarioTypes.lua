@@ -21,11 +21,12 @@ export type StrangerDangerNpc = {
 	SpawnPointId: string,
 	Anchor: string?,
 	Archetype: string,             -- NPC template name (HotDogVendor, etc.)
-	Role: string,                  -- Risky | SafeWithClue | SafeNoClue
+	Role: string,                  -- Risky | Safe
 	Silhouette: StrangerDangerSilhouette,  -- Explorer-visible glance
 	Cues: { string },              -- Guide-visible cue tags (full info)
 	Verdict: string,               -- canonical Approach/AskFirst/Avoid
-	Fragment: StrangerDangerFragment?,  -- truthful or misleading clue
+	Badge: any,
+	Fragment: StrangerDangerFragment?,
 	Bark: string?,                 -- chat-bubble line
 	-- Legacy fields for backwards compatibility with existing renderers:
 	Traits: { string },            -- mirrors Cues for older callers
@@ -34,14 +35,12 @@ export type StrangerDangerNpc = {
 
 export type StrangerDangerScenario = {
 	Type: string,
-	PuppySpawnId: string,
-	PuppyLandmark: string,         -- the truthful landmark fragments point to
 	Npcs: { StrangerDangerNpc },
+	AnswerBadges: { any },
 	GuideManual: {
 		RiskyTags: { string },
 		SafeTags: { string },
 	},
-	Annotations: { [string]: string },
 }
 
 export type BackpackItem = {
@@ -77,29 +76,12 @@ export type BackpackCheckpointScenario = {
 }
 
 ScenarioTypes.NpcRoles = {
-	SafeWithClue = "SafeWithClue",
-	SafeNoClue = "SafeNoClue",
-	Risky = "Risky",
-}
-
-ScenarioTypes.AnnotationMarkers = {
 	Safe = "Safe",
 	Risky = "Risky",
-	AskFirst = "AskFirst",
-	Clear = "Clear",
 }
 
 function ScenarioTypes.IsValidNpcRole(role: string?): boolean
-	return role == ScenarioTypes.NpcRoles.SafeWithClue
-		or role == ScenarioTypes.NpcRoles.SafeNoClue
-		or role == ScenarioTypes.NpcRoles.Risky
-end
-
-function ScenarioTypes.IsValidAnnotationMarker(marker: string?): boolean
-	return marker == ScenarioTypes.AnnotationMarkers.Safe
-		or marker == ScenarioTypes.AnnotationMarkers.Risky
-		or marker == ScenarioTypes.AnnotationMarkers.AskFirst
-		or marker == ScenarioTypes.AnnotationMarkers.Clear
+	return role == ScenarioTypes.NpcRoles.Safe or role == ScenarioTypes.NpcRoles.Risky
 end
 
 return ScenarioTypes

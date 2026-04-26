@@ -19,7 +19,7 @@ function UIBuilder.GetScreenGui(): ScreenGui
 	local newScreen = Instance.new("ScreenGui")
 	newScreen.Name = "BuddyBridgeUI"
 	newScreen.ResetOnSpawn = false
-	newScreen.IgnoreGuiInset = true
+	newScreen.IgnoreGuiInset = false
 	newScreen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	newScreen.Parent = playerGui
 	return newScreen
@@ -43,8 +43,8 @@ function UIBuilder.Toast(message: string, durationSeconds: number?, kind: string
 	if not container then
 		container = Instance.new("Frame")
 		container.Name = "ToastContainer"
-		container.Size = UDim2.new(1, 0, 0, 100)
-		container.Position = UDim2.new(0, 0, 0, 80)
+		container.Size = UDim2.fromScale(1, 0.12)
+		container.Position = UDim2.fromScale(0, 0.1)
 		container.BackgroundTransparency = 1
 		container.ZIndex = 50
 		container.Parent = screen
@@ -55,14 +55,14 @@ function UIBuilder.Toast(message: string, durationSeconds: number?, kind: string
 		layout.Parent = container
 	end
 	local toast = UIStyle.MakePanel({
-		Size = UDim2.new(0, 360, 0, 44),
+		Size = UDim2.fromScale(0.28, 0.44),
 		BackgroundColor3 = (kind == "Error" and UIStyle.Palette.Risky)
 			or (kind == "Success" and UIStyle.Palette.Safe)
 			or UIStyle.Palette.Panel,
 	})
 	local label = UIStyle.MakeLabel({
-		Size = UDim2.new(1, -16, 1, 0),
-		Position = UDim2.new(0, 8, 0, 0),
+		Size = UDim2.fromScale(0.94, 1),
+		Position = UDim2.fromScale(0.03, 0),
 		Text = message,
 		TextSize = UIStyle.TextSize.Body,
 	})

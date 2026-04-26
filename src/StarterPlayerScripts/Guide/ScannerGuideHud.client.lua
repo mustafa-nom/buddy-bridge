@@ -137,8 +137,14 @@ local function refresh()
 end
 
 local function buildPanel()
-	if state.Role ~= RoleTypes.Guide then teardown() return end
-	if state.LevelType ~= LevelTypes.BackpackCheckpoint then teardown() return end
+	if state.Role ~= RoleTypes.Guide then
+		teardown()
+		return
+	end
+	if state.LevelType ~= LevelTypes.BackpackCheckpoint then
+		teardown()
+		return
+	end
 	if panel then return end
 
 	local screen = UIBuilder.GetScreenGui()

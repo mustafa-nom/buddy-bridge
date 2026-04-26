@@ -7,17 +7,11 @@ local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 local Modules = ReplicatedStorage:WaitForChild("Modules")
 local RoleTypes = require(Modules:WaitForChild("RoleTypes"))
 
--- This controller doesn't own UI directly; it just exposes shared role/level
--- state via global table so the manual + annotation controllers can read it
--- without a circular import.
-
 local state = {
 	Role = RoleTypes.None,
 	RoundId = nil :: string?,
 	LevelType = nil :: string?,
 }
-
-_G.BuddyBridge_GuideState = state
 
 RemoteService.OnClientEvent("RoleAssigned", function(payload)
 	state.Role = payload.Role or RoleTypes.None

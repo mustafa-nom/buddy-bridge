@@ -123,8 +123,12 @@ function GuideRehydrate.RehydrateForGuide(round, player: Player)
 	local explorerSeen = DataService.GetEncounteredItems(round.Explorer)
 	local guideSeen = DataService.GetEncounteredItems(round.Guide)
 	local union: { [string]: boolean } = {}
-	for k in pairs(explorerSeen) do union[k] = true end
-	for k in pairs(guideSeen) do union[k] = true end
+	for k in pairs(explorerSeen) do
+		union[k] = true
+	end
+	for k in pairs(guideSeen) do
+		union[k] = true
+	end
 	RemoteService.FireClient(player, "FieldManualUpdated", {
 		RoundId = round.RoundId,
 		Encountered = union,

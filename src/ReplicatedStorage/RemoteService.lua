@@ -23,11 +23,11 @@ RemoteService.Events = {
 	"SelectRole",
 	"StartRound",
 	"RequestInspectNpc",
-	"RequestTalkToNpc",
-	"RequestExplorerAction",  -- Approach | AskFirst | Avoid (new 3-way decision)
+	"RequestNpcDialogChoice",
 	"RequestPickupItem",
 	"RequestPlaceItemInLane",
-	"RequestAnnotateNpc",     -- Stranger Danger only; SD redesign owns its removal
+	"RequestSetSlotBadge",
+	"RequestSubmitAccusation",
 	"RequestScanItem",        -- Backpack Checkpoint Active Scanner Guide
 	"RequestHighlightItem",   -- Backpack Checkpoint Active Scanner Guide
 	"RequestUnlockLane",      -- Backpack Checkpoint Active Scanner Guide
@@ -47,16 +47,14 @@ RemoteService.Events = {
 	"RoundStateUpdated",
 	"LevelStarted",
 	"LevelEnded",
-	"NpcDescriptionShown",
-	"NpcCueRevealed",         -- one cue revealed to Explorer after AskFirst
-	"NpcActionResolved",      -- result of an Approach/AskFirst/Avoid action
-	"NpcAnnotationUpdated",   -- Stranger Danger only; SD redesign owns its removal
+	"OpenNpcDialog",
+	"NpcDialogNoteAdded",
+	"OpenSlotPicker",
+	"BoothStateUpdated",
 	"ConveyorItemSpawned",
 	"ConveyorItemRemoved",
 	"ItemSortResult",
 	"ItemFalloff",            -- item fell off belt edge — counts as a mistake
-	"ClueCollected",
-	"PuppyRevealed",
 	"GuideManualUpdated",
 	"ExplorerFeedback",
 	"ScoreUpdated",

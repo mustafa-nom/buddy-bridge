@@ -118,7 +118,7 @@ function LevelService.PublicScenarioPayload(scenario)
 		return {
 			Type = scenario.Type,
 			Npcs = npcs,
-			TotalCluesNeeded = 3,
+			TotalAccusationSlots = 3,
 		}
 	elseif scenario.Type == LevelTypes.BackpackCheckpoint then
 		return {

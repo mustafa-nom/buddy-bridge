@@ -1,5 +1,5 @@
 --!strict
--- Explorer-side remote handlers: NPC inspect/talk, item pickup/place.
+-- Explorer-side remote handlers: NPC dialog, item pickup/place.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Modules = ReplicatedStorage:WaitForChild("Modules")
@@ -7,28 +7,43 @@ local Constants = require(Modules:WaitForChild("Constants"))
 local LevelTypes = require(Modules:WaitForChild("LevelTypes"))
 local PlayAreaConfig = require(Modules:WaitForChild("PlayAreaConfig"))
 local TagQueries = require(Modules:WaitForChild("TagQueries"))
+local StrangerDangerLogic = require(Modules:WaitForChild("StrangerDangerLogic"))
 local ScoringConfig = require(Modules:WaitForChild("ScoringConfig"))
 local RemoteService = require(ReplicatedStorage:WaitForChild("RemoteService"))
 
-local ScenarioTypes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ScenarioTypes"))
-local StrangerDangerLogic = require(Modules:WaitForChild("StrangerDangerLogic"))
-
 local Services = script.Parent
 local Helpers = Services:WaitForChild("Helpers")
-local RoundContext = require(Helpers:WaitForChild("RoundContext"))
 local RemoteValidation = require(Helpers:WaitForChild("RemoteValidation"))
 local ScoringService = require(Services:WaitForChild("ScoringService"))
 local PlayAreaService = require(Services:WaitForChild("PlayAreaService"))
-local Levels = Services:WaitForChild("Levels")
-local StrangerDangerLevel = require(Levels:WaitForChild("StrangerDangerLevel"))
-local BackpackCheckpointLevel = require(Levels:WaitForChild("BackpackCheckpointLevel"))
+local BackpackCheckpointLevel = require(Services:WaitForChild("Levels"):WaitForChild("BackpackCheckpointLevel"))
 
 local ExplorerInteractionService = {}
 
+local DEFAULT_SAFE_CHOICES = {
+	{ Id = "ask_role", Text = "Are you working here?" },
+	{ Id = "say_thanks", Text = "Thanks for helping." },
+}
+
+local DEFAULT_RISKY_CHOICES = {
+	{ Id = "ask_buddy", Text = "I should ask my buddy first." },
+	{ Id = "no_thanks", Text = "No thanks." },
+	{ Id = "ask_reason", Text = "What are you doing here?" },
+}
+
+local ARCHETYPE_CHOICES = {
+	HotDogVendor = {
+		{ Id = "ask_stand", Text = "Is this your hot dog stand?" },
+		{ Id = "say_thanks", Text = "Thanks!" },
+	},
+	Ranger = {
+		{ Id = "ask_help", Text = "Can you help me find my buddy?" },
+		{ Id = "notice_badge", Text = "I see your ranger badge." },
+	},
+}
+
 local function findNpcInScenario(scenario, npcId: string)
-	if not scenario or not scenario.Npcs then
-		return nil
-	end
+	if not scenario or not scenario.Npcs then return nil end
 	for _, npc in ipairs(scenario.Npcs) do
 		if npc.Id == npcId then
 			return npc
@@ -39,27 +54,54 @@ end
 
 local function findNpcModel(round, npcId: string): Model?
 	local levelState = round.LevelState[LevelTypes.StrangerDangerPark]
-	if not levelState or not levelState.NpcModels then
-		return nil
-	end
-	return levelState.NpcModels[npcId]
+	return levelState and levelState.NpcModels and levelState.NpcModels[npcId] or nil
 end
 
 local function getNpcRoot(model: Model?): BasePart?
-	if not model then
-		return nil
-	end
+	if not model then return nil end
 	local root = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
-	if root and root:IsA("BasePart") then
-		return root :: BasePart
-	end
-	return nil
+	return root and root:IsA("BasePart") and root or nil
 end
 
-local function teleportExplorerToLevelEntry(round)
-	local levelType = round.ActiveScenario and round.ActiveScenario.Type
-	if levelType then
-		PlayAreaService.TeleportToLevelEntry(round, levelType)
+local function getNpcLine(npcInfo): string
+	if typeof(npcInfo.Bark) == "string" and npcInfo.Bark ~= "" then
+		return npcInfo.Bark
+	end
+	return "Hi there."
+end
+
+local function getDialogChoices(npcInfo)
+	local archetypeChoices = ARCHETYPE_CHOICES[npcInfo.Archetype]
+	if archetypeChoices then
+		return archetypeChoices
+	end
+	if npcInfo.Verdict == StrangerDangerLogic.Verdict.Avoid then
+		return DEFAULT_RISKY_CHOICES
+	end
+	return DEFAULT_SAFE_CHOICES
+end
+
+local function cueLinesForNote(npcInfo): { string }
+	local lines = {}
+	for _, tag in ipairs(npcInfo.Cues or { npcInfo.Cue }) do
+		local cue = StrangerDangerLogic.Cues[tag]
+		if cue then
+			table.insert(lines, cue.GuideText)
+		end
+	end
+	return lines
+end
+
+local function upsertNote(round, note)
+	round.ExplorerNotes = round.ExplorerNotes or {}
+	for i = #round.ExplorerNotes, 1, -1 do
+		if round.ExplorerNotes[i].NpcId == note.NpcId then
+			table.remove(round.ExplorerNotes, i)
+		end
+	end
+	table.insert(round.ExplorerNotes, 1, note)
+	while #round.ExplorerNotes > 8 do
+		table.remove(round.ExplorerNotes)
 	end
 end
 
@@ -69,222 +111,74 @@ local function handleInspectNpc(player: Player, npcId: string)
 	if not okPlayer then return end
 	local okRound, _, round = RemoteValidation.RequireRound(player)
 	if not okRound or not round then return end
-	local okRole = RemoteValidation.RequireExplorer(player)
-	if not okRole then return end
-	local okLevel = RemoteValidation.RequireLevelType(round, LevelTypes.StrangerDangerPark)
-	if not okLevel then return end
-	local okRate = RemoteValidation.RequireRateLimit(player, "RequestInspectNpc", Constants.RATE_LIMIT_INSPECT)
-	if not okRate then return end
+	if not RemoteValidation.RequireExplorer(player) then return end
+	if not RemoteValidation.RequireLevelType(round, LevelTypes.StrangerDangerPark) then return end
+	if not RemoteValidation.RequireRateLimit(player, "RequestInspectNpc", Constants.RATE_LIMIT_INSPECT) then return end
 
-	local scenario = round.ActiveScenario
-	local npcInfo = findNpcInScenario(scenario, npcId)
+	local npcInfo = findNpcInScenario(round.ActiveScenario, npcId)
 	if not npcInfo then return end
+	local root = getNpcRoot(findNpcModel(round, npcId))
+	if not root or not RemoteValidation.RequireProximity(player, root, Constants.INSPECT_RADIUS_STUDS) then return end
 
-	local model = findNpcModel(round, npcId)
-	local root = getNpcRoot(model)
-	if not root then return end
-	local okProx = RemoteValidation.RequireProximity(player, root, Constants.INSPECT_RADIUS_STUDS)
-	if not okProx then return end
-
-	round.LastInspectedNpcId = npcId
-	-- ASYMMETRIC VISION: Explorer only gets the silhouette (a glance) plus
-	-- the npc's archetype name so the action card can theme itself. Guide
-	-- gets the full Cues + Verdict so the book can teach the right call.
-	-- The Explorer learns nothing about Risky/Safe role from this remote —
-	-- only the silhouette text and outline. Cues are only revealed to the
-	-- Explorer one-at-a-time when they choose AskFirst.
-	round.LevelState[LevelTypes.StrangerDangerPark] = round.LevelState[LevelTypes.StrangerDangerPark] or {}
-	local levelState = round.LevelState[LevelTypes.StrangerDangerPark]
-	levelState.RevealedCues = levelState.RevealedCues or {}
-	levelState.RevealedCues[npcId] = levelState.RevealedCues[npcId] or {}
-
-	RemoteService.FireClient(round.Explorer, "NpcDescriptionShown", {
+	round.NpcDialogSessions = round.NpcDialogSessions or {}
+	round.NpcDialogSessions[player.UserId] = { NpcId = npcId, StartedAt = os.clock() }
+	RemoteService.FireClient(player, "OpenNpcDialog", {
 		RoundId = round.RoundId,
 		NpcId = npcId,
-		Audience = "Explorer",
 		Archetype = npcInfo.Archetype,
 		Silhouette = npcInfo.Silhouette,
-		RevealedCues = levelState.RevealedCues[npcId],
-	})
-	RemoteService.FireClient(round.Guide, "NpcDescriptionShown", {
-		RoundId = round.RoundId,
-		NpcId = npcId,
-		Audience = "Guide",
-		Archetype = npcInfo.Archetype,
-		Cues = npcInfo.Cues,
-		Verdict = npcInfo.Verdict,
-		Silhouette = npcInfo.Silhouette,
+		Badge = npcInfo.Badge,
+		NpcLine = getNpcLine(npcInfo),
+		Choices = getDialogChoices(npcInfo),
 	})
 end
 
--- ===========================================================================
--- 3-way action handler. Action is "Approach" | "AskFirst" | "Avoid".
--- - Approach safe-with-clue NPC -> clue fragment + trust points
--- - Approach risky NPC -> consequence (teleport + mistake)
--- - Approach safe-no-clue -> friendly chat, no progress
--- - AskFirst -> server reveals one more cue to Explorer (and Guide if not
---   already known) up to a cap, no commit
--- - Avoid risky -> safe, no penalty (correct call)
--- - Avoid safe-with-clue -> missed clue (no penalty, but no progress)
--- ===========================================================================
-
-local MAX_ASKS_PER_NPC = 3
-local TRUST_POINTS_AVOID_RISKY = 5
-local TRUST_POINTS_ASKFIRST = 1
-local TRUST_POINTS_MISSED_CLUE = 0
-
-local function notify(player: Player, kind: string, text: string)
-	RemoteService.FireClient(player, "Notify", { Kind = kind, Text = text })
-end
-
-local function handleExplorerAction(player: Player, npcId: string, action: string)
-	if typeof(npcId) ~= "string" or typeof(action) ~= "string" then return end
+local function handleNpcDialogChoice(player: Player, payload)
+	if typeof(payload) ~= "table" then return end
+	local npcId, choiceId = payload.NpcId, payload.ChoiceId
+	if typeof(npcId) ~= "string" or typeof(choiceId) ~= "string" then return end
 	local okPlayer = RemoteValidation.RequirePlayer(player)
 	if not okPlayer then return end
 	local okRound, _, round = RemoteValidation.RequireRound(player)
 	if not okRound or not round then return end
-	local okRole = RemoteValidation.RequireExplorer(player)
-	if not okRole then return end
-	local okLevel = RemoteValidation.RequireLevelType(round, LevelTypes.StrangerDangerPark)
-	if not okLevel then return end
-	local okRate = RemoteValidation.RequireRateLimit(player, "RequestExplorerAction", Constants.RATE_LIMIT_TALK)
-	if not okRate then return end
+	if not RemoteValidation.RequireExplorer(player) then return end
+	if not RemoteValidation.RequireLevelType(round, LevelTypes.StrangerDangerPark) then return end
+	if not RemoteValidation.RequireRateLimit(player, "RequestNpcDialogChoice", Constants.RATE_LIMIT_TALK) then return end
 
-	local scenario = round.ActiveScenario
-	local npcInfo = findNpcInScenario(scenario, npcId)
+	local session = round.NpcDialogSessions and round.NpcDialogSessions[player.UserId]
+	if not session or session.NpcId ~= npcId then return end
+	local npcInfo = findNpcInScenario(round.ActiveScenario, npcId)
 	if not npcInfo then return end
-	local model = findNpcModel(round, npcId)
-	local root = getNpcRoot(model)
-	if not root then return end
-	local okProx = RemoteValidation.RequireProximity(player, root, Constants.TALK_RADIUS_STUDS)
-	if not okProx then return end
+	local root = getNpcRoot(findNpcModel(round, npcId))
+	if not root or not RemoteValidation.RequireProximity(player, root, Constants.INSPECT_RADIUS_STUDS) then return end
 
-	round.LevelState[LevelTypes.StrangerDangerPark] = round.LevelState[LevelTypes.StrangerDangerPark] or {}
-	local levelState = round.LevelState[LevelTypes.StrangerDangerPark]
-	levelState.RevealedCues = levelState.RevealedCues or {}
-	levelState.RevealedCues[npcId] = levelState.RevealedCues[npcId] or {}
-	levelState.AsksUsed = levelState.AsksUsed or {}
-	levelState.AsksUsed[npcId] = levelState.AsksUsed[npcId] or 0
-	levelState.ResolvedNpcs = levelState.ResolvedNpcs or {}
-
-	-- once an NPC is resolved (Approach or Avoid was chosen), they don't
-	-- accept more actions — the proximity prompt is also disabled below so
-	-- the explorer can't loop on the same NPC.
-	if levelState.ResolvedNpcs[npcId] then
-		notify(player, "Info", "You've already decided about this person.")
-		return
-	end
-
-	local function disablePromptOnNpc()
-		if model then
-			for _, desc in ipairs(model:GetDescendants()) do
-				if desc:IsA("ProximityPrompt") and desc:GetAttribute("BB_NpcId") then
-					desc.Enabled = false
-				end
-			end
+	local validChoice = false
+	for _, choice in ipairs(getDialogChoices(npcInfo)) do
+		if choice.Id == choiceId then
+			validChoice = true
+			break
 		end
 	end
+	if not validChoice then return end
+	round.NpcDialogSessions[player.UserId] = nil
 
-	if action == StrangerDangerLogic.Action.AskFirst then
-		local asks = levelState.AsksUsed[npcId]
-		local available = {}
-		for _, tag in ipairs(npcInfo.Cues) do
-			if not table.find(levelState.RevealedCues[npcId], tag) then
-				table.insert(available, tag)
-			end
-		end
-		if asks >= MAX_ASKS_PER_NPC or #available == 0 then
-			notify(player, "Info", "Buddy can't see any more details from there.")
-			RemoteService.FireClient(round.Explorer, "NpcActionResolved", {
-				RoundId = round.RoundId, NpcId = npcId, Action = action, Result = "NoMoreCues",
-			})
-			return
-		end
-		local revealedTag = available[math.random(#available)]
-		table.insert(levelState.RevealedCues[npcId], revealedTag)
-		levelState.AsksUsed[npcId] = asks + 1
-
-		ScoringService.AddTrustPoints(round, TRUST_POINTS_ASKFIRST, "AskFirst")
-		RemoteService.FireClient(round.Explorer, "NpcCueRevealed", {
-			RoundId = round.RoundId, NpcId = npcId, CueTag = revealedTag,
-			AsksUsed = levelState.AsksUsed[npcId], MaxAsks = MAX_ASKS_PER_NPC,
-		})
-		RemoteService.FireClient(round.Guide, "NpcCueRevealed", {
-			RoundId = round.RoundId, NpcId = npcId, CueTag = revealedTag,
-			AsksUsed = levelState.AsksUsed[npcId], MaxAsks = MAX_ASKS_PER_NPC,
-		})
-		return
-	end
-
-	if action == StrangerDangerLogic.Action.Avoid then
-		levelState.ResolvedNpcs[npcId] = "Avoid"
-		disablePromptOnNpc()
-		local result: string
-		if npcInfo.Role == ScenarioTypes.NpcRoles.Risky then
-			ScoringService.AddTrustPoints(round, TRUST_POINTS_AVOID_RISKY, "AvoidRisky")
-			result = "AvoidedSafely"
-			notify(player, "Success", "Smart call — that one was risky.")
-		elseif npcInfo.Role == ScenarioTypes.NpcRoles.SafeWithClue then
-			ScoringService.AddTrustPoints(round, TRUST_POINTS_MISSED_CLUE, "MissedClue")
-			result = "MissedClue"
-			notify(player, "Info", "They might've had a clue — moving on.")
-		else
-			result = "AvoidedSafely"
-		end
-		RemoteService.FirePair(round, "NpcActionResolved", {
-			RoundId = round.RoundId, NpcId = npcId, Action = action, Result = result,
-			Role = npcInfo.Role,
-		})
-		return
-	end
-
-	-- Approach
-	levelState.ResolvedNpcs[npcId] = "Approach"
-	disablePromptOnNpc()
-	if npcInfo.Role == ScenarioTypes.NpcRoles.SafeWithClue then
-		round.CluesCollected += 1
-		ScoringService.AddTrustPoints(round, Constants.TRUST_POINTS_PER_CLUE, "Clue")
-		RemoteService.FirePair(round, "NpcActionResolved", {
-			RoundId = round.RoundId, NpcId = npcId, Action = action, Result = "ClueGranted",
-			Role = npcInfo.Role,
-		})
-		RemoteService.FirePair(round, "ClueCollected", {
-			RoundId = round.RoundId,
-			NpcId = npcId,
-			ClueText = npcInfo.Fragment and npcInfo.Fragment.Text or npcInfo.ClueText,
-			Truthful = npcInfo.Fragment and npcInfo.Fragment.Truthful,
-			Landmark = npcInfo.Fragment and npcInfo.Fragment.Landmark,
-			Total = round.CluesCollected,
-			NeededTotal = Constants.CLUES_TO_FIND,
-		})
-		StrangerDangerLevel.OnClueCollected(round, scenario)
-	elseif npcInfo.Role == ScenarioTypes.NpcRoles.SafeNoClue then
-		RemoteService.FirePair(round, "NpcActionResolved", {
-			RoundId = round.RoundId, NpcId = npcId, Action = action, Result = "NoClueChat",
-			Role = npcInfo.Role,
-		})
-		notify(player, "Info", "Friendly chat — they don't know about the puppy.")
-	elseif npcInfo.Role == ScenarioTypes.NpcRoles.Risky then
-		ScoringService.AddMistake(round, "Risky")
-		-- Risky NPCs may still hand out a misleading fragment that taints
-		-- the Guide's clue map.
-		if npcInfo.Fragment then
-			RemoteService.FirePair(round, "ClueCollected", {
-				RoundId = round.RoundId, NpcId = npcId,
-				ClueText = npcInfo.Fragment.Text,
-				Truthful = false,
-				Landmark = npcInfo.Fragment.Landmark,
-				Total = round.CluesCollected,
-				NeededTotal = Constants.CLUES_TO_FIND,
-			})
-		end
-		RemoteService.FirePair(round, "NpcActionResolved", {
-			RoundId = round.RoundId, NpcId = npcId, Action = action, Result = "RiskyConsequence",
-			Role = npcInfo.Role,
-		})
-		RemoteService.FirePair(round, "ExplorerFeedback", { Kind = "RiskyConsequence", NpcId = npcId })
-		teleportExplorerToLevelEntry(round)
-	end
+	local note = {
+		NpcId = npcId,
+		Archetype = npcInfo.Archetype,
+		Headline = npcInfo.Silhouette and npcInfo.Silhouette.Headline or "Someone in the park",
+		Badge = npcInfo.Badge,
+		CueTags = npcInfo.Cues or { npcInfo.Cue },
+		CueLines = cueLinesForNote(npcInfo),
+		Quote = getNpcLine(npcInfo),
+		ChoiceId = choiceId,
+		UpdatedAt = os.clock(),
+	}
+	upsertNote(round, note)
+	RemoteService.FirePair(round, "NpcDialogNoteAdded", {
+		RoundId = round.RoundId,
+		Note = note,
+		Notes = round.ExplorerNotes,
+	})
 end
 
 local function handlePickupItem(player: Player, itemId: string)
@@ -293,25 +187,17 @@ local function handlePickupItem(player: Player, itemId: string)
 	if not okPlayer then return end
 	local okRound, _, round = RemoteValidation.RequireRound(player)
 	if not okRound or not round then return end
-	local okRole = RemoteValidation.RequireExplorer(player)
-	if not okRole then return end
-	local okLevel = RemoteValidation.RequireLevelType(round, LevelTypes.BackpackCheckpoint)
-	if not okLevel then return end
-	local okRate = RemoteValidation.RequireRateLimit(player, "RequestPickupItem", Constants.RATE_LIMIT_PICKUP)
-	if not okRate then return end
-
-	if itemId ~= round.ActiveItemId then
-		return
-	end
+	if not RemoteValidation.RequireExplorer(player) then return end
+	if not RemoteValidation.RequireLevelType(round, LevelTypes.BackpackCheckpoint) then return end
+	if not RemoteValidation.RequireRateLimit(player, "RequestPickupItem", Constants.RATE_LIMIT_PICKUP) then return end
+	if itemId ~= round.ActiveItemId then return end
 	local model = BackpackCheckpointLevel.GetActiveItemModel(round)
 	if not model then return end
 	local root = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
 	if not root or not root:IsA("BasePart") then return end
-	local okProx = RemoteValidation.RequireProximity(player, root, Constants.ITEM_PICKUP_RADIUS_STUDS)
-	if not okProx then return end
-
-	-- Mark held; the actual physical pickup happens client-side.
-	BackpackCheckpointLevel.MarkHeld(round, player)
+	if RemoteValidation.RequireProximity(player, root, Constants.ITEM_PICKUP_RADIUS_STUDS) then
+		BackpackCheckpointLevel.MarkHeld(round, player)
+	end
 end
 
 local function handlePlaceItemInLane(player: Player, itemId: string, laneId: string)
@@ -320,17 +206,12 @@ local function handlePlaceItemInLane(player: Player, itemId: string, laneId: str
 	if not okPlayer then return end
 	local okRound, _, round = RemoteValidation.RequireRound(player)
 	if not okRound or not round then return end
-	local okRole = RemoteValidation.RequireExplorer(player)
-	if not okRole then return end
-	local okLevel = RemoteValidation.RequireLevelType(round, LevelTypes.BackpackCheckpoint)
-	if not okLevel then return end
-	local okRate = RemoteValidation.RequireRateLimit(player, "RequestPlaceItemInLane", Constants.RATE_LIMIT_PLACE)
-	if not okRate then return end
+	if not RemoteValidation.RequireExplorer(player) then return end
+	if not RemoteValidation.RequireLevelType(round, LevelTypes.BackpackCheckpoint) then return end
+	if not RemoteValidation.RequireRateLimit(player, "RequestPlaceItemInLane", Constants.RATE_LIMIT_PLACE) then return end
 
-	-- Validate proximity to the matching bin
 	local slot = PlayAreaService.GetSlotForRound(round)
-	if not slot then return end
-	local playArea = slot:FindFirstChild("PlayArea")
+	local playArea = slot and slot:FindFirstChild("PlayArea")
 	if not playArea then return end
 	local levelModel: Model? = nil
 	for _, child in ipairs(playArea:GetChildren()) do
@@ -339,42 +220,22 @@ local function handlePlaceItemInLane(player: Player, itemId: string, laneId: str
 			break
 		end
 	end
-	if not levelModel then return end
-	local bin = TagQueries.GetBinByLane(levelModel, laneId)
-	if not bin then return end
-	local okBin = RemoteValidation.RequireProximity(player, bin, Constants.BIN_RADIUS_STUDS)
-	if not okBin then return end
+	local bin = levelModel and TagQueries.GetBinByLane(levelModel, laneId)
+	if not bin or not RemoteValidation.RequireProximity(player, bin, Constants.BIN_RADIUS_STUDS) then return end
 
-	-- HandleSort returns (accepted, correct, reason).
-	--   accepted=true,  correct=true  → correct sort. WaveDirector advances
-	--                                    via the BeltController's OnResolved
-	--                                    callback; we just score.
-	--   accepted=false, reason="Locked"   → lane was still locked. No score
-	--                                    change; player got a Notify already.
-	--   accepted=false, reason="WrongLane" → wrong but unlocked. Mistake;
-	--                                    item bounces back on the belt.
 	local accepted, correct, reason = BackpackCheckpointLevel.HandleSort(round, itemId, laneId)
 	if accepted and correct then
 		round.ItemsSorted += 1
-		-- Combo multiplier from PRD: ×1.5 at streak 3, ×2.0 at streak 5.
-		-- Compute against post-increment streak so the 3rd correct in a row
-		-- already earns ×1.5.
-		local nextStreak = (round.Streak or 0) + 1
-		local multiplier = ScoringConfig.GetComboMultiplier(nextStreak)
+		local multiplier = ScoringConfig.GetComboMultiplier((round.Streak or 0) + 1)
 		ScoringService.AddTrustPoints(round, Constants.TRUST_POINTS_PER_CORRECT_SORT, "Sort", multiplier)
 	elseif reason == "WrongLane" then
 		ScoringService.AddMistake(round, "WrongLane")
 	end
-	-- "Locked" and any other reason: no scoring side effect.
 end
 
 function ExplorerInteractionService.Init()
 	RemoteService.OnServerEvent("RequestInspectNpc", handleInspectNpc)
-	RemoteService.OnServerEvent("RequestTalkToNpc", function(player, npcId)
-		-- legacy proximity prompt path: treat plain "Talk" as Approach
-		handleExplorerAction(player, npcId, StrangerDangerLogic.Action.Approach)
-	end)
-	RemoteService.OnServerEvent("RequestExplorerAction", handleExplorerAction)
+	RemoteService.OnServerEvent("RequestNpcDialogChoice", handleNpcDialogChoice)
 	RemoteService.OnServerEvent("RequestPickupItem", handlePickupItem)
 	RemoteService.OnServerEvent("RequestPlaceItemInLane", handlePlaceItemInLane)
 end

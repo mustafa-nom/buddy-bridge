@@ -208,12 +208,7 @@ local function armFalloffTimer(round, scenario, onResolved: (string) -> ())
 		if not round.IsActive then return end
 		if scenario ~= round.ActiveScenario then return end
 		if round.ActiveItemId ~= activeId then return end
-		-- Still on belt, not held → fall-off.
-		if state.HeldByPlayer then
-			-- Held by player when timer fires: arm a brief grace, but for P0
-			-- we just give up and treat as fall-off too (drop-not-bin
-			-- recovery is a P2 polish item).
-		end
+			-- Held items still fall off in P0; drop-not-bin recovery is P2 polish.
 		RemoteService.FirePair(round, "ItemFalloff", {
 			RoundId = round.RoundId,
 			ItemId = activeId,

@@ -55,16 +55,17 @@ Build a polished MVP of Buddy Bridge with **2 levels**: Stranger Danger Park and
 
 ## Stranger Danger Park
 
-- [x] `Scenarios/StrangerDangerScenario.lua` — generate randomized NPC scenario with anchor bias
-- [x] `Levels/StrangerDangerLevel.lua` — clone NPCs, attach traits, attach knife accessory
-- [x] `ExplorerInteractionService.lua` — `RequestInspectNpc`, `RequestTalkToNpc`
-- [x] `GuideControlService.lua` — `RequestAnnotateNpc`
-- [x] `ExplorerController.client.lua` — handle proximity-based NPC inspect, talk follow-up
-- [x] `NpcDescriptionCardController.client.lua` — show trait card to Explorer + colored ring on annotation
-- [x] `GuideManualController.client.lua` — render trait/risk manual on booth SurfaceGui (with screen-space fallback)
-- [x] `GuideAnnotationController.client.lua` — annotation buttons
-- [x] Visual: colored ring around NPC when Guide annotates
-- [x] Quest: 3 clues → puppy spawn → level exit
+- [x] `Scenarios/StrangerDangerScenario.lua` — generate exactly 3 Risky NPCs with unique `(Color, Shape)` badges
+- [x] `Levels/StrangerDangerLevel.lua` — clone NPCs, attach badge SurfaceGuis, wire booth slots and submit pad
+- [x] `ExplorerInteractionService.lua` — `RequestInspectNpc` opens server-owned dialog; `RequestNpcDialogChoice` records notes
+- [x] `GuideControlService.lua` — `RequestSetSlotBadge` + `RequestSubmitAccusation` validators
+- [x] `ExplorerController.client.lua` — handle proximity-based NPC talk prompt
+- [x] `NpcDescriptionCardController.client.lua` — dialog-style NPC interaction instead of flat inspect card
+- [x] `GuideNotesController.client.lua` — compact Explorer Notes panel for badge + cue lines
+- [x] `GuideManualController.client.lua` — render trait/risk manual and highlight note cues
+- [x] `GuideBoothController.client.lua` — slot picker UI + per-slot display from `BoothStateUpdated`
+- [x] Visual: NPC badge SurfaceGui + booth slot/attempt SurfaceGuis
+- [x] Submit loop: green slots lock, red slots stay editable, 3 failed submits ends round
 - [ ] Test: full level playthrough with 2 players (HUMAN — needs Studio)
 
 ## Backpack Checkpoint
@@ -72,7 +73,7 @@ Build a polished MVP of Buddy Bridge with **2 levels**: Stranger Danger Park and
 - [x] Generate randomized item rotation server-side (`Scenarios/BackpackCheckpointScenario.lua`)
 - [x] Conveyor logic in `Levels/BackpackCheckpointLevel.lua` — spawn item, advance after sort
 - [x] `ExplorerInteractionService` — `RequestPickupItem`, `RequestPlaceItemInLane`
-- [x] `GuideControlService` — `RequestAnnotateItem`
+- [x] `ScannerService` / Guide scanner HUD — `RequestScanItem`, `RequestHighlightItem`, `RequestUnlockLane`
 - [x] Bin SFX / VFX hookups (placeholder; SFX files come from User 1 + M8 polish pass)
 - [x] Manual UI shows the chart (Pack It / Ask First / Leave It rules)
 - [x] N items per round → level complete
@@ -102,12 +103,14 @@ Build a polished MVP of Buddy Bridge with **2 levels**: Stranger Danger Park and
 
 ## Verification
 
-- [ ] `selene src/` passes (HUMAN — selene not installed locally)
+- [x] `rojo build default.project.json -o build.rbxl` passes
+- [x] `selene src/` passes
 - [x] All files in `src/` under 500 lines (max: 472, BookView.lua, untouched)
 - [x] All remotes validate input + role (canonical chain in Helpers/RemoteValidation)
 - [x] No client-side authoritative gameplay state
+- [x] Retired Stranger Danger/annotation remotes removed from runtime `src/`
 - [ ] Tested with 2 players in Studio local server (HUMAN)
-- [ ] Tested 4 simultaneous duos do not cross-talk (HUMAN — annotation state lives on round.ActiveScenario, all FireClient is scoped via FirePair)
+- [ ] Tested 4 simultaneous duos do not cross-talk (HUMAN — dialog notes and booth state live on the round; all FireClient is scoped via FirePair)
 - [x] `tasks/todo.md` updated
 - [x] `tasks/lessons.md` updated
 
@@ -123,7 +126,7 @@ Per `docs/BACKPACK_CHECKPOINT_DECISION.md` + V1 PRD + edge-case addendum.
 - [x] Fall-off timer → `AddMistake("Fallthrough")` + combo break.
 - [x] Per-item lane locks. Locked-lane sort attempts rejected with soft buzzer.
 - [x] ScannerService remotes: `RequestScanItem` (per-wave cap, cooldown, cached), `RequestHighlightItem` (last-write-wins), `RequestUnlockLane` (mutually exclusive).
-- [x] Annotation system removed from BPC: `RequestAnnotateItem`, `ItemAnnotationUpdated` deleted; SD `RequestAnnotateNpc` retained.
+- [x] Annotation system removed from BPC: scanner/highlight/unlock remotes own the flow.
 - [x] Pixel Post intro slide (non-gating P0 — fades after 5s).
 
 ### P1 (combo, Veto, Mini-Boss, Scanner Guide HUD)
@@ -145,7 +148,7 @@ Per `docs/BACKPACK_CHECKPOINT_DECISION.md` + V1 PRD + edge-case addendum.
 - [ ] Mini-Boss: complete all 3 waves; bag arrives; sort all 3 inner items correctly → success bonus + level complete.
 - [ ] Mini-Boss fail: build Streak ≥5, then deliberately wrong-sort an inner item → round ends with `MiniBossFail`, kid-friendly toast appears, score screen still renders.
 - [ ] Mini-Boss below threshold: with Streak <5, wrong-sort an inner item → AddMistake, bag continues with next inner.
-- [ ] **SD regression smoke** (per addendum): play one Stranger Danger round; verify NPC annotation buttons still work (`RequestAnnotateNpc` → ring colors), no `RemoteService` "remote not found" warnings.
+- [ ] **SD regression smoke**: play one Stranger Danger round; verify Explorer dialog notes populate for Guide and booth slot submission works.
 - [ ] PartnerLeft cleanup: have one player close their client mid-wave or mid-Mini-Boss; verify the round ends cleanly, no orphaned models, slot is released.
 
 ### P2 (shipped)

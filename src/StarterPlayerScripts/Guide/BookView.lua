@@ -374,8 +374,12 @@ function BookView.new(parent: Instance, pages: { PageSpread })
 		_connections = {},
 	}, BookView)
 
-	prev.Activated:Connect(function() self:Prev() end)
-	nextBtn.Activated:Connect(function() self:Next() end)
+	prev.Activated:Connect(function()
+		self:Prev()
+	end)
+	nextBtn.Activated:Connect(function()
+		self:Next()
+	end)
 
 	self:_render()
 	return self
@@ -404,7 +408,9 @@ local function playPageFlip()
 		local clone = s:Clone()
 		clone.Parent = SoundService
 		clone:Play()
-		task.delay(2, function() clone:Destroy() end)
+			task.delay(2, function()
+				clone:Destroy()
+			end)
 	end
 end
 

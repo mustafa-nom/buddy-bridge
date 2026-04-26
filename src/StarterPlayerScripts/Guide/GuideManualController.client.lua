@@ -28,22 +28,15 @@ local state = {
 	-- Fallback: a screen-space backup if we can't find the SurfaceGui.
 	FallbackContainer = nil :: ScreenGui?,
 	-- Polished book overlay shown for the Guide on top of the SurfaceGui
-	-- manual. Includes a live Clue Map page that updates as fragments
-	-- come in from ClueCollected events.
+	-- manual.
 	Book = nil :: any?,
-	Fragments = {} :: { { Truthful: boolean?, Landmark: string?, Text: string, NpcId: string } },
-	NpcOutcomes = {} :: { [string]: string },  -- npcId -> "Approach"|"Avoid"|...
 }
-
-local PLACEHOLDER = "rbxassetid://0"
 
 local function destroyBook()
 	if state.Book then
 		state.Book:Destroy()
 		state.Book = nil
 	end
-	state.Fragments = {}
-	state.NpcOutcomes = {}
 end
 
 local function ensureBook()
@@ -56,63 +49,6 @@ local function ensureBook()
 	local players = game:GetService("Players")
 	local playerGui = players.LocalPlayer:WaitForChild("PlayerGui")
 	state.Book = BookView.new(playerGui, StrangerDangerBookContent)
-end
-
--- Aggregates fragments by landmark and rebuilds the clue map page in place.
--- Truthful fragments cluster around the real landmark; misleading ones spread.
-local function rebuildClueMap()
-	if not state.Book then return end
-	local cluemapIdx = StrangerDangerBookContent.ClueMapIndex()
-
-	local byLandmark: { [string]: number } = {}
-	local lines = {}
-	for _, frag in ipairs(state.Fragments) do
-		local lm = frag.Landmark or "?"
-		byLandmark[lm] = (byLandmark[lm] or 0) + 1
-		local from = state.NpcOutcomes[frag.NpcId or ""]
-		local sourceTag = ""
-		if from == "Approach" then sourceTag = " (verified safe)" end
-		if from == "Avoid" then sourceTag = " (skipped)" end
-		table.insert(lines, "• " .. (frag.Text or "") .. sourceTag)
-	end
-	if #lines == 0 then
-		lines = { "(no fragments yet — go meet someone safe)" }
-	end
-
-	local bestLm: string? = nil
-	local bestCount = 0
-	for lm, count in pairs(byLandmark) do
-		if count > bestCount then
-			bestLm = lm
-			bestCount = count
-		end
-	end
-	local bestLines: { string }
-	if bestLm and bestCount >= 1 then
-		bestLines = {
-			string.format("Most fragments point to %s.", StrangerDangerBookContent.LandmarkLabel(bestLm)),
-			string.format("(%d fragment%s match)", bestCount, bestCount == 1 and "" or "s"),
-			"Tell your buddy where to go!",
-		}
-	else
-		bestLines = { "(need at least one truthful fragment)" }
-	end
-
-	state.Book:SetSpreadAt(cluemapIdx, {
-		Title = "CLUE MAP",
-		Left = {
-			Heading = "Fragments collected",
-			Image = PLACEHOLDER,
-			Caption = "Truthful ones cluster — lies spread out",
-			Bullets = lines,
-		},
-		Right = {
-			Heading = "Best guess",
-			Image = PLACEHOLDER,
-			Caption = "Where the puppy is hiding",
-			Bullets = bestLines,
-		},
-	})
 end
 
 local function findControlPanelSurfaceGui(): SurfaceGui?
@@ -152,9 +88,9 @@ local function getRenderTarget(): Instance
 		screen.ResetOnSpawn = false
 		screen.Parent = players.LocalPlayer:WaitForChild("PlayerGui")
 		local frame = Instance.new("Frame")
-		frame.Size = UDim2.new(0, 320, 0, 480)
+		frame.Size = UDim2.fromScale(0.3, 0.62)
 		frame.AnchorPoint = Vector2.new(0, 0.5)
-		frame.Position = UDim2.new(0, 12, 0.5, 0)
+		frame.Position = UDim2.fromScale(0.02, 0.55)
 		frame.BackgroundColor3 = UIStyle.Palette.Panel
 		frame.BorderSizePixel = 0
 		frame.Name = "ManualPanel"
@@ -217,43 +153,19 @@ RemoteService.OnClientEvent("GuideManualUpdated", function(payload)
 	ensureBook()
 end)
 
-RemoteService.OnClientEvent("NpcDescriptionShown", function(payload)
+RemoteService.OnClientEvent("NpcDialogNoteAdded", function(payload)
 	if state.Role ~= RoleTypes.Guide then return end
-	if payload.Audience ~= "Guide" then return end
+	if payload.RoundId ~= state.RoundId then return end
 	if state.LevelType ~= LevelTypes.StrangerDangerPark then return end
 	if state.ActiveManual then
-		state.ActiveManual:Highlight(payload.Cues or payload.Traits or {})
+		local note = payload.Note or {}
+		state.ActiveManual:Highlight(note.CueTags or {})
 	end
-	-- auto-flip the book to the matching archetype page so the guide can
-	-- read about the npc the explorer is staring at right now
-	if state.Book and payload.Archetype then
-		local idx = StrangerDangerBookContent.ArchetypeIndex(payload.Archetype)
+	if state.Book and payload.Note and payload.Note.Archetype then
+		local idx = StrangerDangerBookContent.ArchetypeIndex(payload.Note.Archetype)
 		if idx then
 			state.Book:GoToIndex(idx)
 		end
-	end
-end)
-
-RemoteService.OnClientEvent("ClueCollected", function(payload)
-	if state.Role ~= RoleTypes.Guide then return end
-	table.insert(state.Fragments, {
-		Truthful = payload.Truthful,
-		Landmark = payload.Landmark,
-		Text = payload.ClueText or "",
-		NpcId = payload.NpcId or "",
-	})
-	rebuildClueMap()
-	-- jump the book to the clue map page so the duo sees their progress
-	if state.Book then
-		state.Book:GoToIndex(StrangerDangerBookContent.ClueMapIndex())
-	end
-end)
-
-RemoteService.OnClientEvent("NpcActionResolved", function(payload)
-	if state.Role ~= RoleTypes.Guide then return end
-	if payload.Action == "Approach" or payload.Action == "Avoid" then
-		state.NpcOutcomes[payload.NpcId] = payload.Action
-		rebuildClueMap()
 	end
 end)
 

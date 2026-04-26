@@ -22,15 +22,24 @@ local function build()
 	local screen = UIBuilder.GetScreenGui()
 	panel = UIStyle.MakePanel({
 		Name = "LobbyProgression",
-		Size = UDim2.new(0, 220, 0, 60),
+		Size = UDim2.fromScale(0.22, 0.08),
 		AnchorPoint = Vector2.new(0, 0),
-		Position = UDim2.new(0, 12, 0, 12),
+		Position = UDim2.fromScale(0.02, 0.1),
 		Parent = screen,
 	})
-	UIBuilder.PadLayout(panel :: Frame, 8)
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop = UDim.new(0.12, 0)
+	pad.PaddingBottom = UDim.new(0.12, 0)
+	pad.PaddingLeft = UDim.new(0.05, 0)
+	pad.PaddingRight = UDim.new(0.05, 0)
+	pad.Parent = panel
+	local layout = Instance.new("UIListLayout")
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Padding = UDim.new(0.04, 0)
+	layout.Parent = panel
 
 	seedsLabel = UIStyle.MakeLabel({
-		Size = UDim2.new(1, 0, 0, 24),
+		Size = UDim2.fromScale(1, 0.48),
 		Text = "🌱 0 Trust Seeds",
 		TextSize = UIStyle.TextSize.Body,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -38,8 +47,7 @@ local function build()
 	seedsLabel.Parent = panel
 
 	treehouseLabel = UIStyle.MakeLabel({
-		Size = UDim2.new(1, 0, 0, 20),
-		Position = UDim2.new(0, 0, 0, 24),
+		Size = UDim2.fromScale(1, 0.4),
 		Text = "Treehouse: stage 1",
 		TextSize = UIStyle.TextSize.Caption,
 		TextColor3 = UIStyle.Palette.TextMuted,
@@ -74,18 +82,26 @@ local function updateTreehouseVisuals(treehouseLevel: number)
 	end
 end
 
-build()
-
-if _G.BuddyBridge_InitialProgression then
-	local p = _G.BuddyBridge_InitialProgression
-	if seedsLabel then seedsLabel.Text = ("🌱 %d Trust Seeds"):format(p.TrustSeeds or 0) end
-	if treehouseLabel then treehouseLabel.Text = ("Treehouse: stage %d"):format(p.TreehouseLevel or 1) end
+local function applyProgression(p)
+	if seedsLabel then
+		seedsLabel.Text = ("🌱 %d Trust Seeds"):format(p.TrustSeeds or 0)
+	end
+	if treehouseLabel then
+		treehouseLabel.Text = ("Treehouse: stage %d"):format(p.TreehouseLevel or 1)
+	end
 	updateTreehouseVisuals(p.TreehouseLevel or 1)
 end
 
+build()
+
+task.spawn(function()
+	local ok, progression = pcall(RemoteService.InvokeServer, "GetProgression")
+	if ok and progression then
+		applyProgression(progression)
+	end
+end)
+
 RemoteService.OnClientEvent("ProgressionUpdated", function(payload)
 	if typeof(payload) ~= "table" then return end
-	if seedsLabel then seedsLabel.Text = ("🌱 %d Trust Seeds"):format(payload.TrustSeeds or 0) end
-	if treehouseLabel then treehouseLabel.Text = ("Treehouse: stage %d"):format(payload.TreehouseLevel or 1) end
-	updateTreehouseVisuals(payload.TreehouseLevel or 1)
+	applyProgression(payload)
 end)

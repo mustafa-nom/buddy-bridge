@@ -385,17 +385,17 @@ end
 -- ===========================================================================
 
 StrangerDangerLogic.ActionResult = {
-	-- Approach a SafeWithClue NPC successfully
+	-- Legacy action-card result names retained only for old data references.
 	ClueGranted = "ClueGranted",
 	-- Approach a Risky NPC -> consequence
 	RiskyConsequence = "RiskyConsequence",
-	-- Approach a SafeNoClue
+	-- Legacy action-card result names retained only for old data references.
 	NoClueChat = "NoClueChat",
 	-- AskFirst -> Guide reveals one more cue
 	CueRevealed = "CueRevealed",
 	-- Avoid -> safe, no progress
 	AvoidedSafely = "AvoidedSafely",
-	-- Avoid a SafeWithClue -> missed opportunity (no penalty)
+	-- Legacy action-card result names retained only for old data references.
 	MissedClue = "MissedClue",
 }
 

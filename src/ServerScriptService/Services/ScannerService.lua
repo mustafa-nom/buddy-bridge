@@ -1,8 +1,8 @@
 --!strict
 -- Backpack Checkpoint Active Scanner Guide tools.
 --
--- Replaces the old `RequestAnnotateItem` annotation flow with the PRD's
--- four-tool workstation: Scan / Highlight / Lane Lock / (Veto in P1).
+-- Implements the PRD's four-tool workstation: Scan / Highlight / Lane Lock /
+-- (Veto in P1).
 --
 --   * RequestScanItem(itemId)   — reveal hidden ScanTags; cooldown + per-wave
 --                                  cap; cached so repeat scans on the same

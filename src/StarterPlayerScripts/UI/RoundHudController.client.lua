@@ -23,8 +23,7 @@ local activeRoundId: string? = nil
 local roundStartedAt = 0
 local mistakes = 0
 local trustPoints = 0
-local cluesCollected = 0
-local cluesNeeded = 3
+local attemptsLeft = 3
 local itemsSorted = 0
 local itemsTotal = 6
 local levelType: string? = nil
@@ -35,44 +34,49 @@ local function build()
 	if panel and panel.Parent then return end
 	panel = UIStyle.MakePanel({
 		Name = "RoundHud",
-		Size = UDim2.new(0, 520, 0, 64),
+		Size = UDim2.fromScale(0.58, 0.075),
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 12),
+		Position = UDim2.fromScale(0.55, 0.015),
 		Parent = screen,
 	})
-	UIBuilder.PadLayout(panel :: Frame, 8)
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop = UDim.new(0.12, 0)
+	pad.PaddingBottom = UDim.new(0.12, 0)
+	pad.PaddingLeft = UDim.new(0.02, 0)
+	pad.PaddingRight = UDim.new(0.02, 0)
+	pad.Parent = panel
 
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.VerticalAlignment = Enum.VerticalAlignment.Center
-	layout.Padding = UDim.new(0, 16)
+	layout.Padding = UDim.new(0.03, 0)
 	layout.Parent = panel
 
 	timeLabel = UIStyle.MakeLabel({
-		Size = UDim2.new(0, 90, 1, 0),
+		Size = UDim2.fromScale(0.16, 1),
 		Text = "0:00",
 		TextSize = UIStyle.TextSize.Heading,
 	})
 	timeLabel.Parent = panel
 
 	mistakesLabel = UIStyle.MakeLabel({
-		Size = UDim2.new(0, 80, 1, 0),
+		Size = UDim2.fromScale(0.16, 1),
 		Text = "0 misses",
 		TextSize = UIStyle.TextSize.Body,
 	})
 	mistakesLabel.Parent = panel
 
 	trustLabel = UIStyle.MakeLabel({
-		Size = UDim2.new(0, 110, 1, 0),
+		Size = UDim2.fromScale(0.18, 1),
 		Text = "0 trust",
 		TextSize = UIStyle.TextSize.Body,
 	})
 	trustLabel.Parent = panel
 
 	objectiveLabel = UIStyle.MakeLabel({
-		Size = UDim2.new(0, 200, 1, 0),
+		Size = UDim2.fromScale(0.36, 1),
 		Text = "",
 		TextSize = UIStyle.TextSize.Body,
 		TextColor3 = UIStyle.Palette.Highlight,
@@ -100,7 +104,7 @@ end
 local function refreshObjective()
 	if not objectiveLabel then return end
 	if levelType == LevelTypes.StrangerDangerPark then
-		objectiveLabel.Text = ("Find %d / %d clues"):format(cluesCollected, cluesNeeded)
+		objectiveLabel.Text = ("Pick 3 risky badges - %d tries left"):format(attemptsLeft)
 	elseif levelType == LevelTypes.BackpackCheckpoint then
 		objectiveLabel.Text = ("Sort %d / %d items"):format(itemsSorted, itemsTotal)
 	else
@@ -109,7 +113,9 @@ local function refreshObjective()
 end
 
 local function startTicker()
-	if heartbeat then heartbeat:Disconnect() end
+	if heartbeat then
+		heartbeat:Disconnect()
+	end
 	heartbeat = RunService.Heartbeat:Connect(function()
 		if not activeRoundId or not timeLabel then return end
 		local elapsed = os.clock() - roundStartedAt
@@ -124,10 +130,14 @@ RemoteService.OnClientEvent("RoundStarted", function(payload)
 	roundStartedAt = payload.StartedAt or os.clock()
 	mistakes = 0
 	trustPoints = 0
-	cluesCollected = 0
+	attemptsLeft = 3
 	itemsSorted = 0
-	if mistakesLabel then mistakesLabel.Text = "0 misses" end
-	if trustLabel then trustLabel.Text = "0 trust" end
+	if mistakesLabel then
+		mistakesLabel.Text = "0 misses"
+	end
+	if trustLabel then
+		trustLabel.Text = "0 trust"
+	end
 	startTicker()
 end)
 
@@ -135,12 +145,9 @@ RemoteService.OnClientEvent("LevelStarted", function(payload)
 	if typeof(payload) ~= "table" then return end
 	if payload.RoundId ~= activeRoundId then return end
 	levelType = payload.LevelType
-	cluesCollected = 0
+	attemptsLeft = 3
 	itemsSorted = 0
 	if payload.Scenario then
-		if payload.Scenario.TotalCluesNeeded then
-			cluesNeeded = payload.Scenario.TotalCluesNeeded
-		end
 		if payload.Scenario.Total then
 			itemsTotal = payload.Scenario.Total
 		end
@@ -153,14 +160,17 @@ RemoteService.OnClientEvent("ScoreUpdated", function(payload)
 	if payload.RoundId and payload.RoundId ~= activeRoundId then return end
 	mistakes = payload.Mistakes or mistakes
 	trustPoints = payload.TrustPoints or trustPoints
-	if mistakesLabel then mistakesLabel.Text = ("%d miss%s"):format(mistakes, mistakes == 1 and "" or "es") end
-	if trustLabel then trustLabel.Text = ("%s trust"):format(NumberFormatter.Comma(trustPoints)) end
+	if mistakesLabel then
+		mistakesLabel.Text = ("%d miss%s"):format(mistakes, mistakes == 1 and "" or "es")
+	end
+	if trustLabel then
+		trustLabel.Text = ("%s trust"):format(NumberFormatter.Comma(trustPoints))
+	end
 end)
 
-RemoteService.OnClientEvent("ClueCollected", function(payload)
+RemoteService.OnClientEvent("BoothStateUpdated", function(payload)
 	if payload.RoundId ~= activeRoundId then return end
-	cluesCollected = payload.Total or cluesCollected
-	cluesNeeded = payload.NeededTotal or cluesNeeded
+	attemptsLeft = payload.AttemptsLeft or attemptsLeft
 	refreshObjective()
 end)
 

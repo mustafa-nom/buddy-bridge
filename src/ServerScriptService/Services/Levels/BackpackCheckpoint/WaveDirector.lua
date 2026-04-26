@@ -98,11 +98,13 @@ function WaveDirector.FinishWave(round, scenario, onLevelComplete: () -> ())
 		local state = getState(round)
 		local onFail = state.OnMiniBossFail
 		task.delay(0.8, function()
-			if not round.IsActive then return end
-			if scenario ~= round.ActiveScenario then return end
-			MiniBossDirector.Begin(round, scenario, onLevelComplete, function()
-				if onFail then onFail() end
-			end)
+				if not round.IsActive then return end
+				if scenario ~= round.ActiveScenario then return end
+				MiniBossDirector.Begin(round, scenario, onLevelComplete, function()
+					if onFail then
+						onFail()
+					end
+				end)
 		end)
 		return
 	end

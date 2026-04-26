@@ -104,7 +104,7 @@ function NpcRegistry.GetTagsByRisk(risk: string): { string }
 end
 
 -- Sample clue text fragments. Index doesn't matter — ScenarioService picks
--- 3 random ones and they all hint at the same chosen PuppySpawn.
+-- Legacy registry kept for display names; current Stranger Danger uses badge notes.
 NpcRegistry.ClueFragments = {
 	"I saw a fluffy pup near the fountain.",
 	"I think I heard a puppy bark behind the playground slide.",

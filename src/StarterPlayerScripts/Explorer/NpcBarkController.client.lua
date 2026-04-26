@@ -5,7 +5,6 @@
 -- so a hovering player doesn't spam-trigger them.
 
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
 local CollectionService = game:GetService("CollectionService")
 local Chat = game:GetService("Chat")
 local RunService = game:GetService("RunService")
@@ -63,5 +62,7 @@ end
 
 RunService.Heartbeat:Connect(function(dt)
 	-- only run every 0.4s to keep it cheap
-	if math.random() < dt / 0.4 then tick(dt) end
-end)
+		if math.random() < dt / 0.4 then
+			tick(dt)
+		end
+	end)
